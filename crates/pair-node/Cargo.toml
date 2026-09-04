@@ -1,0 +1,18 @@
+[package]
+name = "pair-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "openpair node daemon (supervisor) - clean-room PAIR-interoperable node"
+
+[[bin]]
+name = "openpair-node"
+path = "src/main.rs"
+
+[dependencies]
+pair-proto = { path = "../pair-proto" }
+pair-nodeinfo = { path = "../pair-nodeinfo" }
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tokio.workspace = true

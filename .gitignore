@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+Cargo.lock.orig
+*.pdb
+.DS_Store
+# Never commit reverse-engineering inputs or third-party binaries into the
+# clean-room repository (kept outside this repo on purpose).
+/vendor-samples/
+*.asar

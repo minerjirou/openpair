@@ -1,0 +1,14 @@
+openpair
+Copyright 2026 The openpair authors
+
+This is an independent, clean-room implementation of a node that interoperates
+with the "Personal AI Router" (PAIR) LAN inference-clustering protocol.
+
+It contains NO third-party source code. Only the interoperability contract of
+the protocol (network service identifiers, message field names, wire framing and
+cryptographic parameters required to inter[-]operate) has been reproduced, as is
+necessary and customary for interoperable software. No proprietary binaries,
+decompiler output, or copyrighted assets are included in this repository.
+
+"NVIDIA", "PAIR" and "Personal AI Router" are trademarks of their respective
+owners. This project is not affiliated with, endorsed by, or sponsored by NVIDIA.
