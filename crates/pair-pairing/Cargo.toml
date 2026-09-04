@@ -3,6 +3,7 @@ name = "pair-pairing"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "EAP-NOOB (RFC 9140) PIN pairing: cryptosuites, one-step KDF, MACs"
 
 [dependencies]
 pair-proto = { path = "../pair-proto" }
@@ -11,3 +12,9 @@ serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+sha2 = "0.10"
+hmac = "0.12"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+p256 = { version = "0.13", features = ["ecdh"] }
+rand = "0.8"
+base64 = "0.22"
