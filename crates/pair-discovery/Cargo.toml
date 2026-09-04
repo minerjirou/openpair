@@ -3,6 +3,7 @@ name = "pair-discovery"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "mDNS/DNS-SD discovery for the _nvpair-node._tcp cluster service"
 
 [dependencies]
 pair-proto = { path = "../pair-proto" }
@@ -11,3 +12,4 @@ serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+mdns-sd = "0.11"
