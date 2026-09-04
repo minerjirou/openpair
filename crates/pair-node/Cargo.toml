@@ -12,7 +12,9 @@ path = "src/main.rs"
 [dependencies]
 pair-proto = { path = "../pair-proto" }
 pair-nodeinfo = { path = "../pair-nodeinfo" }
+pair-discovery = { path = "../pair-discovery" }
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio.workspace = true
+uuid = { version = "1", features = ["v4"] }

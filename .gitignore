@@ -7,3 +7,7 @@ Cargo.lock.orig
 # clean-room repository (kept outside this repo on purpose).
 /vendor-samples/
 *.asar
+
+# Reverse-engineering analysis notes stay local (clean-room hygiene)
+/docs/protocol-rpc.md
+/docs/protocol-crypto.md

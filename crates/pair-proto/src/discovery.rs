@@ -42,8 +42,12 @@ impl NodeRecord {
                 None => continue,
             };
             match k {
-                "uuid" | "node" | "nodeUuid" | "node_uuid" => rec.node_uuid = Some(v.to_string()),
-                "cluster" | "clusterUuid" | "cluster_uuid" => {
+                "uuid" | "node" | "nodeUuid" | "node_uuid" | "node-uuid" => {
+                    rec.node_uuid = Some(v.to_string())
+                }
+                // `cluster-uuid` is byte-verified (ClusterUUIDFromTXT); accept the
+                // other spellings defensively.
+                "cluster" | "cluster-uuid" | "clusterUuid" | "cluster_uuid" => {
                     rec.cluster_uuid = Some(v.to_string())
                 }
                 "addr" | "addresses" => rec.addresses.push(v.to_string()),

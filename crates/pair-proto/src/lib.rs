@@ -11,6 +11,7 @@
 //! below reproduces a tag recovered from the reference implementation. Where the
 //! exact envelope shape is still being confirmed it is marked `TODO(interop)`.
 
+pub mod contract;
 pub mod jsonrpc;
 pub mod telemetry;
 pub mod discovery;

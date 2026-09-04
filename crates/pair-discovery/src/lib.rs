@@ -99,12 +99,13 @@ impl Discovery {
 
 /// Convert a [`NodeRecord`] to mDNS TXT key/value properties.
 fn record_to_txt(record: &NodeRecord) -> HashMap<String, String> {
+    use pair_proto::contract::txt_keys;
     let mut props = HashMap::new();
     if let Some(u) = &record.node_uuid {
-        props.insert("uuid".to_string(), u.clone());
+        props.insert(txt_keys::NODE_UUID.to_string(), u.clone());
     }
     if let Some(c) = &record.cluster_uuid {
-        props.insert("cluster".to_string(), c.clone());
+        props.insert(txt_keys::CLUSTER_UUID.to_string(), c.clone());
     }
     for (k, v) in &record.extra {
         props.insert(k.clone(), v.clone());
@@ -136,7 +137,7 @@ mod tests {
         rec.node_uuid = Some("n-1".into());
         rec.cluster_uuid = Some("c-1".into());
         let props = record_to_txt(&rec);
-        assert_eq!(props.get("uuid").map(String::as_str), Some("n-1"));
-        assert_eq!(props.get("cluster").map(String::as_str), Some("c-1"));
+        assert_eq!(props.get("nodeUuid").map(String::as_str), Some("n-1"));
+        assert_eq!(props.get("cluster-uuid").map(String::as_str), Some("c-1"));
     }
 }

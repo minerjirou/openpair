@@ -3,6 +3,7 @@ name = "pair-trust"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Cluster identity (Ed25519 X.509), certificate pinning, and mutual-TLS trust"
 
 [dependencies]
 pair-proto = { path = "../pair-proto" }
@@ -11,3 +12,10 @@ serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+rcgen = { version = "0.13", features = ["pem", "crypto"] }
+rustls-pki-types = "1"
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+x509-parser = "0.16"
