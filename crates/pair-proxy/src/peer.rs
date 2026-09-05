@@ -81,9 +81,17 @@ mod tests {
 
         // Mutual pinning.
         let server_pins = Arc::new(RwLock::new(PeerPinStore::new()));
-        server_pins.write().unwrap().pin(&client_id.cert_der).unwrap();
+        server_pins
+            .write()
+            .unwrap()
+            .pin(&client_id.cert_der)
+            .unwrap();
         let client_pins = Arc::new(RwLock::new(PeerPinStore::new()));
-        client_pins.write().unwrap().pin(&server_id.cert_der).unwrap();
+        client_pins
+            .write()
+            .unwrap()
+            .pin(&server_id.cert_der)
+            .unwrap();
 
         // Start the TLS ingress server on an ephemeral port.
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -131,7 +139,11 @@ mod tests {
         let client_id = Identity::generate().unwrap();
         // Server pins the client, but the client does NOT pin the server.
         let server_pins = Arc::new(RwLock::new(PeerPinStore::new()));
-        server_pins.write().unwrap().pin(&client_id.cert_der).unwrap();
+        server_pins
+            .write()
+            .unwrap()
+            .pin(&client_id.cert_der)
+            .unwrap();
         let empty_pins = Arc::new(RwLock::new(PeerPinStore::new()));
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

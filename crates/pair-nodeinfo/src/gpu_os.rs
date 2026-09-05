@@ -57,7 +57,10 @@ pub fn parse_win32_video(json: &str) -> Vec<Gpu> {
         .iter()
         .filter_map(|it| {
             let name = it.get("Name")?.as_str()?.trim().to_string();
-            let vram_bytes = it.get("AdapterRAM").and_then(|r| r.as_u64()).filter(|&n| n > 0);
+            let vram_bytes = it
+                .get("AdapterRAM")
+                .and_then(|r| r.as_u64())
+                .filter(|&n| n > 0);
             let pnp = it.get("PNPDeviceID").and_then(|p| p.as_str()).unwrap_or("");
             let vendor = vendor_from_pnp(pnp);
             let vendor_id = vendor_id_from_pnp(pnp);
@@ -83,7 +86,9 @@ fn vendor_id_from_pnp(pnp: &str) -> Option<u16> {
 }
 
 fn vendor_from_pnp(pnp: &str) -> GpuVendor {
-    vendor_id_from_pnp(pnp).map(GpuVendor::from_pci_id).unwrap_or(GpuVendor::Other)
+    vendor_id_from_pnp(pnp)
+        .map(GpuVendor::from_pci_id)
+        .unwrap_or(GpuVendor::Other)
 }
 
 #[cfg(target_os = "macos")]
@@ -114,11 +119,15 @@ pub fn parse_macos_displays(json: &str) -> Vec<Gpu> {
                         .or_else(|| g.get("_name"))?
                         .as_str()?
                         .to_string();
-                    let vendor = if name.to_lowercase().contains("amd") || name.to_lowercase().contains("radeon") {
+                    let vendor = if name.to_lowercase().contains("amd")
+                        || name.to_lowercase().contains("radeon")
+                    {
                         GpuVendor::Amd
                     } else if name.to_lowercase().contains("nvidia") {
                         GpuVendor::Nvidia
-                    } else if name.to_lowercase().contains("apple") || name.to_lowercase().contains("intel") {
+                    } else if name.to_lowercase().contains("apple")
+                        || name.to_lowercase().contains("intel")
+                    {
                         GpuVendor::Intel
                     } else {
                         GpuVendor::Other

@@ -33,7 +33,11 @@ impl PeerPinStore {
         let fingerprint = cert_fingerprint(cert_der);
         self.by_uuid.insert(
             node_uuid.clone(),
-            PinnedPeer { node_uuid: node_uuid.clone(), cert_der: cert_der.to_vec(), fingerprint },
+            PinnedPeer {
+                node_uuid: node_uuid.clone(),
+                cert_der: cert_der.to_vec(),
+                fingerprint,
+            },
         );
         Ok(node_uuid)
     }

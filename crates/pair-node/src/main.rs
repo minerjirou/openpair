@@ -64,7 +64,8 @@ async fn main() -> anyhow::Result<()> {
 
     let data_dir = PathBuf::from(env_or("OPENPAIR_DATA_DIR", "./openpair-data"));
     let backend = env_or("OPENPAIR_BACKEND", "127.0.0.1:11434");
-    let proxy_bind: std::net::SocketAddr = env_or("OPENPAIR_PROXY_BIND", "127.0.0.1:11435").parse()?;
+    let proxy_bind: std::net::SocketAddr =
+        env_or("OPENPAIR_PROXY_BIND", "127.0.0.1:11435").parse()?;
     let nodeinfo_bind: std::net::SocketAddr =
         env_or("OPENPAIR_NODEINFO_BIND", "127.0.0.1:7071").parse()?;
     let advertise_port: u16 = env_or("OPENPAIR_ADVERTISE_PORT", "7443").parse()?;
@@ -99,7 +100,8 @@ async fn main() -> anyhow::Result<()> {
     // 3. node-info HTTP server (GET /v1/node-info).
     let ni_node_id = node_id.clone();
     tokio::spawn(async move {
-        if let Err(e) = nodeinfo_server::serve(nodeinfo_bind, ni_node_id, std::future::pending()).await
+        if let Err(e) =
+            nodeinfo_server::serve(nodeinfo_bind, ni_node_id, std::future::pending()).await
         {
             warn!(error = %e, "node-info server exited");
         }
@@ -123,7 +125,11 @@ async fn main() -> anyhow::Result<()> {
     let ing_backend = backend.clone();
     tokio::spawn(async move {
         if let Err(e) = pair_proxy::ingress_server::serve_ingress(
-            ingress_bind, &ing_id, ing_pins, ing_backend, std::future::pending(),
+            ingress_bind,
+            &ing_id,
+            ing_pins,
+            ing_backend,
+            std::future::pending(),
         )
         .await
         {
@@ -165,7 +171,8 @@ async fn main() -> anyhow::Result<()> {
                 let peers = routing.read().unwrap().pinned_peers();
                 for (nid, host, port) in peers {
                     if let Ok(models) =
-                        pair_proxy::tags::fetch_peer_models(&id_arc, pins.clone(), &host, port).await
+                        pair_proxy::tags::fetch_peer_models(&id_arc, pins.clone(), &host, port)
+                            .await
                     {
                         routing.write().unwrap().set_peer_models(&nid, models);
                     }
@@ -185,7 +192,8 @@ async fn main() -> anyhow::Result<()> {
             routing: routing.clone(),
         };
         tokio::spawn(async move {
-            if let Err(e) = pair_proxy::serve_routing(proxy_bind, ctx, std::future::pending()).await {
+            if let Err(e) = pair_proxy::serve_routing(proxy_bind, ctx, std::future::pending()).await
+            {
                 warn!(error = %e, "proxy exited");
             }
         });
@@ -194,8 +202,10 @@ async fn main() -> anyhow::Result<()> {
 
     // 6. Discovery: advertise + browse -> populate the routing table.
     let discovery = Discovery::new()?;
-    let mut record = NodeRecord::default();
-    record.node_uuid = Some(node_id.clone());
+    let record = NodeRecord {
+        node_uuid: Some(node_id.clone()),
+        ..Default::default()
+    };
     let host = hostname();
     if let Err(e) = discovery.advertise(&node_id, &host, advertise_port, &record) {
         warn!(error = %e, "advertise failed");

@@ -71,7 +71,10 @@ async fn handle(
     backend: Arc<String>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     if req.uri().path() != endpoints::INGRESS {
-        return Ok(Response::builder().status(404).body(Full::new(Bytes::new())).unwrap());
+        return Ok(Response::builder()
+            .status(404)
+            .body(Full::new(Bytes::new()))
+            .unwrap());
     }
     let body = match req.into_body().collect().await {
         Ok(b) => b.to_bytes(),
@@ -91,7 +94,11 @@ async fn handle(
             txt: Some("ok".into()),
             ..Default::default()
         },
-        Err(e) => IngressEnvelope { code: Some(502), txt: Some(format!("{e}")), ..Default::default() },
+        Err(e) => IngressEnvelope {
+            code: Some(502),
+            txt: Some(format!("{e}")),
+            ..Default::default()
+        },
     };
     let out = serde_json::to_vec(&reply).unwrap_or_default();
     Ok(Response::builder()
@@ -102,7 +109,10 @@ async fn handle(
 }
 
 fn bad_request() -> Response<Full<Bytes>> {
-    Response::builder().status(400).body(Full::new(Bytes::new())).unwrap()
+    Response::builder()
+        .status(400)
+        .body(Full::new(Bytes::new()))
+        .unwrap()
 }
 
 #[cfg(test)]
@@ -130,7 +140,9 @@ mod tests {
                         let r = format!("engine:{p}:{}", String::from_utf8_lossy(&b));
                         Ok::<_, Infallible>(Response::new(Full::new(Bytes::from(r))))
                     });
-                    let _ = hyper::server::conn::http1::Builder::new().serve_connection(io, svc).await;
+                    let _ = hyper::server::conn::http1::Builder::new()
+                        .serve_connection(io, svc)
+                        .await;
                 });
             }
         });
@@ -148,9 +160,15 @@ mod tests {
         drop(bind);
         let b_id = b.clone();
         tokio::spawn(async move {
-            serve_ingress(b_ingress, &b_id, b_pins, engine_addr.to_string(), std::future::pending())
-                .await
-                .unwrap();
+            serve_ingress(
+                b_ingress,
+                &b_id,
+                b_pins,
+                engine_addr.to_string(),
+                std::future::pending(),
+            )
+            .await
+            .unwrap();
         });
         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
@@ -161,8 +179,13 @@ mod tests {
             name: Some("llama3".into()),
             ..Default::default()
         };
-        let resp = forward_to_peer(&a, a_pins, "127.0.0.1", b_ingress.port(), &env).await.unwrap();
+        let resp = forward_to_peer(&a, a_pins, "127.0.0.1", b_ingress.port(), &env)
+            .await
+            .unwrap();
         assert_eq!(resp.code, Some(200));
-        assert_eq!(resp.data.as_deref(), Some("engine:/api/generate:{\"model\":\"llama3\"}"));
+        assert_eq!(
+            resp.data.as_deref(),
+            Some("engine:/api/generate:{\"model\":\"llama3\"}")
+        );
     }
 }

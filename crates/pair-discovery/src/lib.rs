@@ -32,7 +32,9 @@ pub struct DiscoveredPeer {
 
 impl Discovery {
     pub fn new() -> anyhow::Result<Self> {
-        Ok(Self { daemon: ServiceDaemon::new()? })
+        Ok(Self {
+            daemon: ServiceDaemon::new()?,
+        })
     }
 
     /// Advertise this node as `_nvpair-node._tcp` with the given instance name,
@@ -61,7 +63,10 @@ impl Discovery {
         )?
         .enable_addr_auto();
         self.daemon.register(info)?;
-        debug!(instance = instance_name, port, "advertising _nvpair-node._tcp");
+        debug!(
+            instance = instance_name,
+            port, "advertising _nvpair-node._tcp"
+        );
         Ok(())
     }
 
@@ -133,9 +138,11 @@ mod tests {
 
     #[test]
     fn txt_roundtrip_keys() {
-        let mut rec = NodeRecord::default();
-        rec.node_uuid = Some("n-1".into());
-        rec.cluster_uuid = Some("c-1".into());
+        let rec = NodeRecord {
+            node_uuid: Some("n-1".into()),
+            cluster_uuid: Some("c-1".into()),
+            ..Default::default()
+        };
         let props = record_to_txt(&rec);
         assert_eq!(props.get("nodeUuid").map(String::as_str), Some("n-1"));
         assert_eq!(props.get("cluster-uuid").map(String::as_str), Some("c-1"));

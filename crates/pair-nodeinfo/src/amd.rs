@@ -9,6 +9,7 @@
 //!   1. `amd-smi` (ROCm 6+): `amd-smi static --json` + `amd-smi metric --json`
 //!   2. `rocm-smi` (legacy): `rocm-smi --showproductname --showmeminfo vram
 //!      --showuse --json` (reports VRAM already in bytes)
+//!
 //! Missing tools are not an error: the node reports no AMD GPUs.
 
 use pair_proto::{Gpu, GpuVendor};
@@ -46,7 +47,11 @@ pub fn detect_sysfs() -> Vec<Gpu> {
             continue;
         }
         let dev = entry.path().join("device");
-        let read = |f: &str| std::fs::read_to_string(dev.join(f)).ok().map(|s| s.trim().to_string());
+        let read = |f: &str| {
+            std::fs::read_to_string(dev.join(f))
+                .ok()
+                .map(|s| s.trim().to_string())
+        };
         // AMD PCI vendor id is 0x1002.
         if read("vendor").as_deref() != Some("0x1002") {
             continue;
@@ -82,7 +87,13 @@ pub fn detect_tools() -> Vec<Gpu> {
     }
     if let Some(js) = run(
         "rocm-smi",
-        &["--showproductname", "--showmeminfo", "vram", "--showuse", "--json"],
+        &[
+            "--showproductname",
+            "--showmeminfo",
+            "vram",
+            "--showuse",
+            "--json",
+        ],
     ) {
         return parse_rocm_smi_json(&js);
     }
@@ -122,15 +133,19 @@ pub fn parse_amd_smi(static_json: &str, metric_json: Option<&str>) -> Vec<Gpu> {
                 .unwrap_or_else(|| "AMD GPU".to_string());
             let uuid = find_str(e, &["uuid", "serial", "bdf", "market_name"])
                 .unwrap_or_else(|| format!("amd-gpu-{}", idx.unwrap_or(0)));
-            let vram_bytes = find_num(e, &["size", "total", "vram_total", "total_vram"]).map(mb_to_bytes);
+            let vram_bytes =
+                find_num(e, &["size", "total", "vram_total", "total_vram"]).map(mb_to_bytes);
 
             let metric = idx.and_then(|i| {
-                metrics.iter().find(|m| m.get("gpu").and_then(Value::as_u64) == Some(i))
+                metrics
+                    .iter()
+                    .find(|m| m.get("gpu").and_then(Value::as_u64) == Some(i))
             });
             let (util, used) = metric
                 .map(|m| {
                     (
-                        find_num(m, &["gfx_activity", "gfx", "gpu_activity", "usage"]).map(|v| v as u32),
+                        find_num(m, &["gfx_activity", "gfx", "gpu_activity", "usage"])
+                            .map(|v| v as u32),
                         find_num(m, &["used_vram", "vram_used", "used"]).map(mb_to_bytes),
                     )
                 })
@@ -167,8 +182,11 @@ pub fn parse_rocm_smi_json(json: &str) -> Vec<Gpu> {
     cards
         .iter()
         .map(|(key, c)| {
-            let name = find_str(c, &["Card Series", "Device Name", "Market Name", "Card Model"])
-                .unwrap_or_else(|| "AMD GPU".to_string());
+            let name = find_str(
+                c,
+                &["Card Series", "Device Name", "Market Name", "Card Model"],
+            )
+            .unwrap_or_else(|| "AMD GPU".to_string());
             let uuid = find_str(c, &["Unique ID", "Serial Number", "PCI Bus"])
                 .unwrap_or_else(|| (*key).clone());
             let vram_bytes = find_str_num(c, "VRAM Total Memory (B)");

@@ -13,9 +13,9 @@ pub mod mtls;
 pub mod pin;
 pub mod uuid_scheme;
 
+pub use cluster_dir::load_or_init as load_cluster_dir;
 pub use identity::{cert_fingerprint, node_uuid_from_cert, Identity};
 pub use mtls::{client_config, server_config, SharedPins};
-pub use cluster_dir::load_or_init as load_cluster_dir;
 pub use pin::{PeerPinStore, PinnedPeer};
 pub use uuid_scheme::{node_urn, uuid_from_urn, NODE_URN_PREFIX};
 

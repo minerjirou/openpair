@@ -122,15 +122,15 @@ async fn route_inner(
         }
         None => Ok(Response::builder()
             .status(503)
-            .body(Full::new(Bytes::from_static(b"no node can serve this model")))
+            .body(Full::new(Bytes::from_static(
+                b"no node can serve this model",
+            )))
             .unwrap()),
     }
 }
 
 fn build_response(code: u16, body: Bytes) -> anyhow::Result<Response<Full<Bytes>>> {
-    Ok(Response::builder()
-        .status(code)
-        .body(Full::new(body))?)
+    Ok(Response::builder().status(code).body(Full::new(body))?)
 }
 
 #[cfg(test)]
@@ -160,7 +160,9 @@ mod tests {
                             String::from_utf8_lossy(&b)
                         )))))
                     });
-                    let _ = hyper::server::conn::http1::Builder::new().serve_connection(io, svc).await;
+                    let _ = hyper::server::conn::http1::Builder::new()
+                        .serve_connection(io, svc)
+                        .await;
                 });
             }
         });
@@ -178,9 +180,15 @@ mod tests {
         drop(bl);
         let b_id = b.clone();
         tokio::spawn(async move {
-            serve_ingress(b_ingress, &b_id, b_pins, engine_addr.to_string(), std::future::pending())
-                .await
-                .unwrap();
+            serve_ingress(
+                b_ingress,
+                &b_id,
+                b_pins,
+                engine_addr.to_string(),
+                std::future::pending(),
+            )
+            .await
+            .unwrap();
         });
 
         // A: routing table knows only B serves "llama3"; A serves nothing.
@@ -206,7 +214,9 @@ mod tests {
         let a_proxy = al.local_addr().unwrap();
         drop(al);
         tokio::spawn(async move {
-            serve_routing(a_proxy, ctx, std::future::pending()).await.unwrap();
+            serve_routing(a_proxy, ctx, std::future::pending())
+                .await
+                .unwrap();
         });
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 

@@ -51,7 +51,9 @@ impl Identity {
         // SAN: URI urn:nvpair:node:<uuid>
         params
             .subject_alt_names
-            .push(rcgen::SanType::URI(rcgen::Ia5String::try_from(node_urn(node_uuid))?));
+            .push(rcgen::SanType::URI(rcgen::Ia5String::try_from(node_urn(
+                node_uuid,
+            ))?));
         // EKU: server + client auth (mutual TLS both directions).
         params.extended_key_usages = vec![
             rcgen::ExtendedKeyUsagePurpose::ServerAuth,
@@ -76,7 +78,13 @@ impl Identity {
         let key_pkcs8_der = key_pair.serialize_der();
         let key_pem = key_pair.serialize_pem();
 
-        Ok(Self { node_uuid: node_uuid.to_string(), cert_der, key_pkcs8_der, cert_pem, key_pem })
+        Ok(Self {
+            node_uuid: node_uuid.to_string(),
+            cert_der,
+            key_pkcs8_der,
+            cert_pem,
+            key_pem,
+        })
     }
 
     /// `sha256:<hex>` fingerprint over the certificate DER.

@@ -12,10 +12,10 @@
 //! exact envelope shape is still being confirmed it is marked `TODO(interop)`.
 
 pub mod contract;
+pub mod discovery;
 pub mod jsonrpc;
 pub mod telemetry;
-pub mod discovery;
 
+pub use discovery::{NodeRecord, MDNS_SERVICE_TYPE};
 pub use jsonrpc::{RpcError, RpcId, RpcMessage, RpcNotification, RpcRequest, RpcResponse};
 pub use telemetry::{Cpu, Gpu, GpuVendor, MemoryInfo, NodeInfo};
-pub use discovery::{NodeRecord, MDNS_SERVICE_TYPE};

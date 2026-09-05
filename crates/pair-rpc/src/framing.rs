@@ -101,7 +101,11 @@ async fn read_content_length<R: AsyncRead + Unpin>(r: &mut R) -> anyhow::Result<
     loop {
         let n = r.read(&mut byte).await?;
         if n == 0 {
-            return Ok(if header.is_empty() { None } else { Some(Vec::new()) });
+            return Ok(if header.is_empty() {
+                None
+            } else {
+                Some(Vec::new())
+            });
         }
         header.push(byte[0]);
         if header.ends_with(b"\r\n\r\n") {

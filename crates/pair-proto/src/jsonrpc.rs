@@ -80,20 +80,31 @@ impl<'de> Deserialize<'de> for JsonRpcVersion {
         if v == "2.0" {
             Ok(JsonRpcVersion)
         } else {
-            Err(serde::de::Error::custom(format!("unsupported jsonrpc version: {v}")))
+            Err(serde::de::Error::custom(format!(
+                "unsupported jsonrpc version: {v}"
+            )))
         }
     }
 }
 
 impl RpcRequest {
     pub fn new(method: impl Into<String>, params: Option<Value>, id: RpcId) -> Self {
-        Self { jsonrpc: JsonRpcVersion, method: method.into(), params, id }
+        Self {
+            jsonrpc: JsonRpcVersion,
+            method: method.into(),
+            params,
+            id,
+        }
     }
 }
 
 impl RpcNotification {
     pub fn new(method: impl Into<String>, params: Option<Value>) -> Self {
-        Self { jsonrpc: JsonRpcVersion, method: method.into(), params }
+        Self {
+            jsonrpc: JsonRpcVersion,
+            method: method.into(),
+            params,
+        }
     }
 }
 
@@ -103,7 +114,11 @@ mod tests {
 
     #[test]
     fn request_roundtrip() {
-        let req = RpcRequest::new("nodes.upsert", Some(serde_json::json!({"uuid":"x"})), RpcId::Num(7));
+        let req = RpcRequest::new(
+            "nodes.upsert",
+            Some(serde_json::json!({"uuid":"x"})),
+            RpcId::Num(7),
+        );
         let s = serde_json::to_string(&req).unwrap();
         assert!(s.contains("\"jsonrpc\":\"2.0\""));
         assert!(s.contains("\"method\":\"nodes.upsert\""));

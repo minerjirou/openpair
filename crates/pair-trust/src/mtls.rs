@@ -13,7 +13,9 @@ use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, Server
 use rustls::crypto::{verify_tls13_signature, CryptoProvider};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName, UnixTime};
 use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
-use rustls::{ClientConfig, DigitallySignedStruct, DistinguishedName, ServerConfig, SignatureScheme};
+use rustls::{
+    ClientConfig, DigitallySignedStruct, DistinguishedName, ServerConfig, SignatureScheme,
+};
 use std::sync::{Arc, RwLock};
 
 /// Shared, mutable set of pinned peers.
@@ -39,7 +41,9 @@ impl PinnedPeerVerifier {
             .unwrap_or(false)
     }
     fn schemes(&self) -> Vec<SignatureScheme> {
-        self.provider.signature_verification_algorithms.supported_schemes()
+        self.provider
+            .signature_verification_algorithms
+            .supported_schemes()
     }
 }
 
@@ -55,7 +59,9 @@ impl ServerCertVerifier for PinnedPeerVerifier {
         if self.accept(end_entity) {
             Ok(ServerCertVerified::assertion())
         } else {
-            Err(rustls::Error::General("server certificate not pinned".into()))
+            Err(rustls::Error::General(
+                "server certificate not pinned".into(),
+            ))
         }
     }
 
@@ -75,7 +81,12 @@ impl ServerCertVerifier for PinnedPeerVerifier {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(message, cert, dss, &self.provider.signature_verification_algorithms)
+        verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
@@ -97,7 +108,9 @@ impl ClientCertVerifier for PinnedPeerVerifier {
         if self.accept(end_entity) {
             Ok(ClientCertVerified::assertion())
         } else {
-            Err(rustls::Error::General("client certificate not pinned".into()))
+            Err(rustls::Error::General(
+                "client certificate not pinned".into(),
+            ))
         }
     }
 
@@ -116,7 +129,12 @@ impl ClientCertVerifier for PinnedPeerVerifier {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(message, cert, dss, &self.provider.signature_verification_algorithms)
+        verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
@@ -133,7 +151,10 @@ fn cert_and_key(id: &Identity) -> (Vec<CertificateDer<'static>>, PrivateKeyDer<'
 /// Build a TLS 1.3 server config that requires and pins client certificates.
 pub fn server_config(id: &Identity, pins: SharedPins) -> anyhow::Result<ServerConfig> {
     let provider = provider();
-    let verifier = Arc::new(PinnedPeerVerifier { pins, provider: provider.clone() });
+    let verifier = Arc::new(PinnedPeerVerifier {
+        pins,
+        provider: provider.clone(),
+    });
     let (chain, key) = cert_and_key(id);
     let cfg = ServerConfig::builder_with_provider(provider)
         .with_protocol_versions(&[&rustls::version::TLS13])?
@@ -146,7 +167,10 @@ pub fn server_config(id: &Identity, pins: SharedPins) -> anyhow::Result<ServerCo
 /// server certificate.
 pub fn client_config(id: &Identity, pins: SharedPins) -> anyhow::Result<ClientConfig> {
     let provider = provider();
-    let verifier = Arc::new(PinnedPeerVerifier { pins, provider: provider.clone() });
+    let verifier = Arc::new(PinnedPeerVerifier {
+        pins,
+        provider: provider.clone(),
+    });
     let (chain, key) = cert_and_key(id);
     let cfg = ClientConfig::builder_with_provider(provider)
         .with_protocol_versions(&[&rustls::version::TLS13])?

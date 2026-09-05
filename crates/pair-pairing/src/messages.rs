@@ -46,9 +46,17 @@ pub struct WireMessage {
     pub vers: Option<Vec<u32>>,
     #[serde(rename = "Verp", default, skip_serializing_if = "Option::is_none")]
     pub verp: Option<u32>,
-    #[serde(rename = "Cryptosuites", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "Cryptosuites",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub cryptosuites: Option<Vec<u8>>,
-    #[serde(rename = "Cryptosuitep", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "Cryptosuitep",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub cryptosuitep: Option<u8>,
     #[serde(rename = "Dirs", default, skip_serializing_if = "Option::is_none")]
     pub dirs: Option<u8>,

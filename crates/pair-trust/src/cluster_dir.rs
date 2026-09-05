@@ -23,7 +23,10 @@ pub fn load_or_init(dir: &Path) -> anyhow::Result<(Identity, PeerPinStore)> {
     std::fs::create_dir_all(&trusted)?;
 
     let identity = if crt.exists() && key.exists() {
-        Identity::from_pem(&std::fs::read_to_string(&crt)?, &std::fs::read_to_string(&key)?)?
+        Identity::from_pem(
+            &std::fs::read_to_string(&crt)?,
+            &std::fs::read_to_string(&key)?,
+        )?
     } else {
         let id = Identity::generate()?;
         std::fs::write(&crt, &id.cert_pem)?;
@@ -61,7 +64,11 @@ pub fn load_trusted_into(trusted_dir: &Path, pins: &mut PeerPinStore) -> anyhow:
 
 /// Write a peer certificate (PEM) into `trusted/` under its node UUID, pinning
 /// it. Returns the pinned node UUID.
-pub fn add_trusted_peer(dir: &Path, peer_cert_pem: &str, pins: &mut PeerPinStore) -> anyhow::Result<String> {
+pub fn add_trusted_peer(
+    dir: &Path,
+    peer_cert_pem: &str,
+    pins: &mut PeerPinStore,
+) -> anyhow::Result<String> {
     let der = pem_cert_to_der(peer_cert_pem)
         .ok_or_else(|| anyhow::anyhow!("no CERTIFICATE block in peer PEM"))?;
     let uuid = pins.pin(&der)?;

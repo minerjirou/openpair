@@ -33,7 +33,10 @@ pub struct RoutingTable {
 
 impl RoutingTable {
     pub fn new(local_id: impl Into<String>) -> Self {
-        Self { local_id: local_id.into(), ..Default::default() }
+        Self {
+            local_id: local_id.into(),
+            ..Default::default()
+        }
     }
 
     pub fn set_local_models<I: IntoIterator<Item = String>>(&mut self, models: I) {
@@ -50,7 +53,13 @@ impl RoutingTable {
 
     /// Insert or update a peer's address/pin metadata without disturbing the
     /// model set already learned for it.
-    pub fn upsert_peer_meta(&mut self, node_id: &str, host: String, ingress_port: u16, pinned: bool) {
+    pub fn upsert_peer_meta(
+        &mut self,
+        node_id: &str,
+        host: String,
+        ingress_port: u16,
+        pinned: bool,
+    ) {
         self.peers
             .entry(node_id.to_string())
             .and_modify(|p| {

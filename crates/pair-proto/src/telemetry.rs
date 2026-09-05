@@ -15,12 +15,13 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GpuVendor {
     Nvidia,
     Amd,
     Intel,
+    #[default]
     Other,
 }
 
@@ -61,12 +62,6 @@ pub struct Gpu {
     pub vendor_id: Option<u16>,
 }
 
-impl Default for GpuVendor {
-    fn default() -> Self {
-        GpuVendor::Other
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Cpu {
     /// Confirmed wire key: `name`.
@@ -105,7 +100,11 @@ pub struct NodeInfo {
     pub host_uuid: Option<String>,
     #[serde(rename = "nodeUuid", default, skip_serializing_if = "Option::is_none")]
     pub node_uuid: Option<String>,
-    #[serde(rename = "clusterUuid", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "clusterUuid",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub cluster_uuid: Option<String>,
 }
 
@@ -159,7 +158,10 @@ mod tests {
         assert_eq!(ni.gpus.len(), 2);
         assert_eq!(ni.gpus[0].name, "NVIDIA GeForce RTX 5070");
         assert_eq!(ni.gpus[0].vram_bytes, Some(12523143168));
-        assert_eq!(ni.cpu.as_ref().unwrap().name, "AMD Ryzen 7 9700X 8-Core Processor");
+        assert_eq!(
+            ni.cpu.as_ref().unwrap().name,
+            "AMD Ryzen 7 9700X 8-Core Processor"
+        );
         assert_eq!(ni.cpu.as_ref().unwrap().cores, Some(8));
         assert_eq!(ni.memory.unwrap().total_bytes, 34359738368);
         assert!(!ni.telemetry_valid);

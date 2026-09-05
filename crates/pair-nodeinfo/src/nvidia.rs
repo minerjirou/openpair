@@ -15,13 +15,19 @@ const MIB: u64 = 1 << 20;
 /// Detect NVIDIA GPUs and their live telemetry. Returns empty if nvidia-smi is
 /// absent or reports nothing.
 pub fn detect() -> Vec<Gpu> {
-    let statik = match run(&["--query-gpu=uuid,name,memory.total", "--format=csv,noheader,nounits"]) {
+    let statik = match run(&[
+        "--query-gpu=uuid,name,memory.total",
+        "--format=csv,noheader,nounits",
+    ]) {
         Some(out) => parse_static(&out),
         None => return Vec::new(),
     };
-    let dynamic = run(&["--query-gpu=uuid,utilization.gpu,memory.used", "--format=csv,noheader,nounits"])
-        .map(|o| parse_dynamic(&o))
-        .unwrap_or_default();
+    let dynamic = run(&[
+        "--query-gpu=uuid,utilization.gpu,memory.used",
+        "--format=csv,noheader,nounits",
+    ])
+    .map(|o| parse_dynamic(&o))
+    .unwrap_or_default();
     merge(statik, &dynamic)
 }
 
@@ -82,7 +88,10 @@ fn merge(mut statik: Vec<Gpu>, dynamic: &BTreeMap<String, (Option<u32>, Option<u
 
 /// Split one `nvidia-smi` CSV row (comma+space separated, values may be "[N/A]").
 fn split_csv(line: &str) -> Vec<String> {
-    line.split(',').map(|s| s.trim().to_string()).filter(|_| !line.trim().is_empty()).collect()
+    line.split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|_| !line.trim().is_empty())
+        .collect()
 }
 
 #[cfg(test)]

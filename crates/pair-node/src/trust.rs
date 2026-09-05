@@ -12,7 +12,11 @@ use std::path::Path;
 
 /// Publish our cert into `dir` and pin all other node certs found there.
 /// Returns the number of peers pinned.
-pub fn bootstrap_dev_trust(dir: &Path, identity: &Identity, pins: &SharedPins) -> anyhow::Result<usize> {
+pub fn bootstrap_dev_trust(
+    dir: &Path,
+    identity: &Identity,
+    pins: &SharedPins,
+) -> anyhow::Result<usize> {
     std::fs::create_dir_all(dir)?;
     let ours = dir.join(format!("{}.pem", identity.node_uuid));
     std::fs::write(&ours, &identity.cert_pem)?;

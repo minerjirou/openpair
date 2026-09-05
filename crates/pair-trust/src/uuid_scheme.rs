@@ -21,7 +21,10 @@ mod tests {
     fn urn_roundtrip() {
         let u = "abcd";
         assert_eq!(node_urn(u), "urn:nvpair:node:abcd");
-        assert_eq!(uuid_from_urn("urn:nvpair:node:abcd").as_deref(), Some("abcd"));
+        assert_eq!(
+            uuid_from_urn("urn:nvpair:node:abcd").as_deref(),
+            Some("abcd")
+        );
         assert_eq!(uuid_from_urn("urn:other:xyz"), None);
     }
 }

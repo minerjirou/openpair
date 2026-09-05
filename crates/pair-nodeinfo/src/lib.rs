@@ -30,7 +30,9 @@ pub fn detect_gpus() -> Vec<Gpu> {
 /// Collect a full node telemetry snapshot.
 pub fn collect(node_uuid: Option<String>, cluster_uuid: Option<String>) -> NodeInfo {
     let gpus = detect_gpus();
-    let telemetry_valid = gpus.iter().any(|g| g.vram_used_bytes.is_some() || g.utilization_percent.is_some());
+    let telemetry_valid = gpus
+        .iter()
+        .any(|g| g.vram_used_bytes.is_some() || g.utilization_percent.is_some());
     NodeInfo {
         gpus,
         cpu: host::cpu(),
@@ -77,7 +79,11 @@ mod host {
         };
         let cores = sys.physical_core_count().map(|c| c as u32);
         Some(Cpu {
-            name: if name.is_empty() { "unknown".into() } else { name },
+            name: if name.is_empty() {
+                "unknown".into()
+            } else {
+                name
+            },
             cores,
             total_threads: Some(cpus.len() as u32),
             utilization_percent: None,
@@ -92,7 +98,10 @@ mod host {
         if total == 0 {
             return None;
         }
-        Some(MemoryInfo { total_bytes: total, used_bytes: Some(sys.used_memory()) })
+        Some(MemoryInfo {
+            total_bytes: total,
+            used_bytes: Some(sys.used_memory()),
+        })
     }
 }
 

@@ -3,6 +3,7 @@
 //! Confirmed suites (from `suiteByID` + rodata):
 //! * **1** = X25519, JWK `{"kty":"OKP","crv":"X25519","x":…}`
 //! * **2** = NIST P-256, JWK `{"kty":"EC","crv":"P-256","x":…,"y":…}`
+//!
 //! All coordinates are base64url (no padding).
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -41,7 +42,10 @@ impl Suite {
                     x: URL_SAFE_NO_PAD.encode(public.as_bytes()),
                     y: None,
                 };
-                KeyPair { secret: SecretKey::X25519(secret), public_jwk: jwk }
+                KeyPair {
+                    secret: SecretKey::X25519(secret),
+                    public_jwk: jwk,
+                }
             }
             Suite::P256 => {
                 let secret = p256::ecdh::EphemeralSecret::random(&mut rand::thread_rng());
@@ -54,7 +58,10 @@ impl Suite {
                     x: URL_SAFE_NO_PAD.encode(x),
                     y: Some(URL_SAFE_NO_PAD.encode(y)),
                 };
-                KeyPair { secret: SecretKey::P256(secret), public_jwk: jwk }
+                KeyPair {
+                    secret: SecretKey::P256(secret),
+                    public_jwk: jwk,
+                }
             }
         }
     }
@@ -85,17 +92,30 @@ impl KeyPair {
     pub fn compute_z(&self, peer: &Jwk) -> anyhow::Result<Vec<u8>> {
         match &self.secret {
             SecretKey::X25519(sk) => {
-                anyhow::ensure!(peer.kty == "OKP" && peer.crv == "X25519", "peer JWK is not X25519");
+                anyhow::ensure!(
+                    peer.kty == "OKP" && peer.crv == "X25519",
+                    "peer JWK is not X25519"
+                );
                 let xb = URL_SAFE_NO_PAD.decode(peer.x.as_bytes())?;
-                let arr: [u8; 32] = xb.as_slice().try_into().map_err(|_| anyhow::anyhow!("bad X25519 x len"))?;
+                let arr: [u8; 32] = xb
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| anyhow::anyhow!("bad X25519 x len"))?;
                 let peer_pub = x25519_dalek::PublicKey::from(arr);
                 Ok(sk.diffie_hellman(&peer_pub).as_bytes().to_vec())
             }
             SecretKey::P256(sk) => {
-                anyhow::ensure!(peer.kty == "EC" && peer.crv == "P-256", "peer JWK is not P-256");
+                anyhow::ensure!(
+                    peer.kty == "EC" && peer.crv == "P-256",
+                    "peer JWK is not P-256"
+                );
                 let x = URL_SAFE_NO_PAD.decode(peer.x.as_bytes())?;
-                let y = URL_SAFE_NO_PAD
-                    .decode(peer.y.as_ref().ok_or_else(|| anyhow::anyhow!("P-256 JWK missing y"))?.as_bytes())?;
+                let y = URL_SAFE_NO_PAD.decode(
+                    peer.y
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("P-256 JWK missing y"))?
+                        .as_bytes(),
+                )?;
                 let mut uncompressed = Vec::with_capacity(1 + x.len() + y.len());
                 uncompressed.push(0x04);
                 uncompressed.extend_from_slice(&x);

@@ -1,48 +1,129 @@
 # openpair
 
-A clean-room, from-scratch **Rust** implementation of a node that interoperates
-with the *Personal AI Router* (PAIR) LAN AI-inference clustering protocol — plus
-first-class **AMD / ROCm** GPU support that the reference node lacks.
+**A clean-room, Rust implementation of a node that interoperates with the
+*Personal AI Router* (PAIR) LAN AI-inference clustering protocol — with
+first-class AMD / ROCm GPU support.**
 
-> Independent reimplementation. Contains no third-party source code; only the
-> protocol interoperability contract is reproduced. See `NOTICE`.
+[![CI](https://github.com/OWNER/openpair/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/openpair/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+
+> **Independent reimplementation.** openpair contains **no third-party source
+> code**. Only the *interoperability contract* of the protocol (network service
+> identifiers, message field names, wire framing, and the cryptographic
+> parameters required to interoperate) is reproduced, as is necessary and
+> customary for interoperable software. See [`NOTICE`](./NOTICE) and
+> [Legal](#legal).
+
+---
 
 ## Why
 
-The reference stack routes LLM inference requests across machines on a LAN
-(mutual-TLS cluster, mDNS discovery, PIN pairing). Its GPU telemetry layer only
-understands `nvidia-smi`, so AMD boxes cannot pull their weight. `openpair`:
+A PAIR cluster lets several machines on a LAN act as one inference system: an
+app talks to a local endpoint, and requests transparently route to whichever
+machine has a free GPU and the right model. The reference stack's GPU-telemetry
+layer only understands `nvidia-smi`, so **AMD boxes can't pull their weight**.
 
-1. **Interoperates** with real PAIR clusters (same discovery, IPC, and cluster
-   security contract), and
-2. **Supports ROCm/AMD** (and NVIDIA) uniformly, so a Radeon/Instinct host is a
-   first-class cluster member.
+openpair does two things:
+
+1. **Interoperates** with a PAIR cluster — the same mDNS discovery, JSON-RPC
+   IPC, mutual-TLS trust model, and HTTP data plane; and
+2. **Supports AMD / ROCm** (and NVIDIA, and Intel) *uniformly*, so a
+   Radeon/Instinct host is a first-class cluster member.
+
+## Features
+
+- **GPU telemetry, any vendor** — NVIDIA (`nvidia-smi`), AMD (kernel `amdgpu`
+  sysfs — *no ROCm tools needed* — or `amd-smi`/`rocm-smi`), and OS-level
+  inventory (Windows WMI, macOS `system_profiler`). Cross-platform CPU/memory
+  via `sysinfo`.
+- **mDNS discovery** of the `_nvpair-node._tcp` service, advertise + browse.
+- **Cluster trust** — Ed25519 node certificates, certificate **pinning**, and
+  **TLS 1.3 mutual auth**; a reference-compatible `node.crt` / `node.key` /
+  `trusted/` cluster directory.
+- **EAP-NOOB (RFC 9140) pairing primitives** — X25519 / P-256 cryptosuites, the
+  NIST SP 800-56C one-step KDF, HMAC-SHA256 confirmation.
+- **Data plane** — a loopback Ollama (`/api/*`) / OpenAI (`/v1/*`) reverse proxy
+  that routes each request to the local engine or a pinned peer that advertises
+  the requested model, forwarding over mutual-TLS `/ingress`.
+- One integrated daemon: `openpair-node`.
 
 ## Workspace layout
 
 | crate | role |
 |-------|------|
-| `pair-proto` | wire types: JSON-RPC 2.0 envelope, telemetry schema, mDNS/TXT contract |
-| `pair-nodeinfo` | CPU/mem + GPU telemetry with **NVIDIA (`nvidia-smi`)** and **AMD (`amd-smi`/`rocm-smi`)** backends |
-| `pair-discovery` | mDNS `_nvpair-node._tcp` responder + browser |
-| `pair-trust` | mutual-TLS identity, certificate minting, peer pinning |
-| `pair-pairing` | EAP-NOOB (RFC 9140) PIN pairing |
-| `pair-proxy` | Ollama/OpenAI reverse proxy + cluster `/ingress` (mTLS) |
-| `pair-node` | node daemon / supervisor binary (`openpair-node`) |
+| [`pair-proto`](crates/pair-proto) | wire types: JSON-RPC 2.0 envelope, telemetry schema, mDNS/TXT contract, confirmed method/endpoint constants |
+| [`pair-rpc`](crates/pair-rpc) | newline-delimited JSON-RPC 2.0 stdio transport |
+| [`pair-nodeinfo`](crates/pair-nodeinfo) | CPU/memory + GPU telemetry (NVIDIA / AMD / OS inventory) |
+| [`pair-discovery`](crates/pair-discovery) | mDNS `_nvpair-node._tcp` advertise + browse |
+| [`pair-trust`](crates/pair-trust) | Ed25519 identity, cert pinning, mutual-TLS, cluster dir |
+| [`pair-pairing`](crates/pair-pairing) | EAP-NOOB (RFC 9140) cryptosuites, KDF, MACs, messages |
+| [`pair-proxy`](crates/pair-proxy) | reverse proxy, model-based routing, mTLS `/ingress` |
+| [`pair-node`](crates/pair-node) | the `openpair-node` daemon |
+
+## Quick start
+
+```sh
+# Build & test everything
+cargo build --workspace
+cargo test  --workspace
+
+# See what GPUs are detected (and via which backend)
+cargo run -p pair-node --bin openpair-node -- --gpucheck
+
+# Run a node (talks to a local Ollama at 127.0.0.1:11434 by default)
+cargo run -p pair-node --bin openpair-node
+curl -s http://127.0.0.1:7071/v1/node-info | jq
+```
+
+### Configuration (environment)
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `OPENPAIR_BACKEND` | `127.0.0.1:11434` | local engine (Ollama) authority |
+| `OPENPAIR_PROXY_BIND` | `127.0.0.1:11435` | loopback Ollama/OpenAI proxy |
+| `OPENPAIR_NODEINFO_BIND` | `127.0.0.1:7071` | `GET /v1/node-info` |
+| `OPENPAIR_INGRESS_BIND` | `0.0.0.0:7443` | mutual-TLS `/ingress` for peers |
+| `OPENPAIR_ADVERTISE_PORT` | `7443` | mDNS advertised port |
+| `OPENPAIR_CLUSTER_DIR` | — | reference-compatible trust dir (`node.crt`/`node.key`/`trusted/`) |
+| `OPENPAIR_DATA_DIR` | `./openpair-data` | standalone identity store (when no cluster dir) |
+
+## Documentation
+
+- [`docs/PROTOCOL.md`](docs/PROTOCOL.md) — the interoperability contract, each
+  item tagged **[confirmed]** or **[live]** (pending dynamic capture).
+- [`docs/ROCM_E2E.md`](docs/ROCM_E2E.md) — validating the AMD/ROCm path on real
+  hardware.
+- [`docs/DYNAMIC_ANALYSIS_PLAN.md`](docs/DYNAMIC_ANALYSIS_PLAN.md) — how to close
+  the remaining byte-exact `[live]` items.
+- [`ROADMAP.md`](ROADMAP.md) — phased plan and status.
 
 ## Status
 
-Early. `pair-proto` and `pair-nodeinfo` (incl. ROCm) are implemented and tested;
-discovery / trust / pairing / proxy are being built as the protocol contract is
-finalized. See `docs/`.
+Early but functional and tested (60+ unit/integration tests). The
+statically-determinable protocol surface is implemented and verified, including
+live checks against real hardware and the reference `nvpair-node-info` worker
+(the `/v1/node-info` wire shape matches). A short list of byte-exact pairing
+serializations still needs confirmation from a live two-node capture — these are
+clearly marked `TODO(interop)` in the source and enumerated in
+`docs/DYNAMIC_ANALYSIS_PLAN.md`.
 
-## Build
+## Contributing
 
-```sh
-cargo build --workspace
-cargo test  --workspace
-```
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports: [`SECURITY.md`](SECURITY.md).
+
+## Legal
+
+openpair is an **independent, interoperable reimplementation** written from
+scratch. It ships **no** third-party source code, binaries, decompiler output,
+or copyrighted assets. Reproducing a protocol's interface for interoperability
+is the project's sole purpose.
+
+"NVIDIA", "PAIR", and "Personal AI Router" are trademarks of their respective
+owners. **This project is not affiliated with, endorsed, or sponsored by
+NVIDIA.** Names are used only nominatively to describe compatibility. You are
+responsible for ensuring your use complies with the licenses and terms that
+apply to any software you interoperate with.
 
 ## License
 
-Apache-2.0. See `LICENSE` and `NOTICE`.
+Licensed under the [Apache License, Version 2.0](LICENSE). See [`NOTICE`](NOTICE).

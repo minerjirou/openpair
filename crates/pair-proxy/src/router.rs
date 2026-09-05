@@ -31,7 +31,7 @@ pub struct Candidate {
 
 /// Pick the best candidate for a model from the given set, or `None` if nothing
 /// eligible. Selection order: manual > lowest priority rank > self > stable by id.
-pub fn select<'a>(candidates: &'a [Candidate]) -> Option<&'a Candidate> {
+pub fn select(candidates: &[Candidate]) -> Option<&Candidate> {
     let eligible: Vec<&Candidate> = candidates
         .iter()
         .filter(|c| c.advertises_model && (c.is_self || c.pinned))
@@ -56,14 +56,23 @@ pub fn select<'a>(candidates: &'a [Candidate]) -> Option<&'a Candidate> {
         return Some(c);
     }
     // 4. Deterministic default: stable by node id.
-    eligible.into_iter().min_by(|a, b| a.node_id.cmp(&b.node_id))
+    eligible
+        .into_iter()
+        .min_by(|a, b| a.node_id.cmp(&b.node_id))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn cand(id: &str, model: bool, is_self: bool, pinned: bool, rank: Option<u32>, manual: bool) -> Candidate {
+    fn cand(
+        id: &str,
+        model: bool,
+        is_self: bool,
+        pinned: bool,
+        rank: Option<u32>,
+        manual: bool,
+    ) -> Candidate {
         Candidate {
             node_id: id.into(),
             base_url: format!("http://{id}"),
