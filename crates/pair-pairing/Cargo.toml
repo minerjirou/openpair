@@ -8,7 +8,7 @@ description = "EAP-NOOB (RFC 9140) PIN pairing: cryptosuites, one-step KDF, MACs
 [dependencies]
 pair-proto = { path = "../pair-proto" }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { version = "1", features = ["raw_value"] }
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

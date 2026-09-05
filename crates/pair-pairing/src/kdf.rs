@@ -14,6 +14,13 @@ pub const EAPNOOB_OUTPUT_LEN: usize = 320;
 /// Algorithm-id literal that leads FixedInfo (byte-verified).
 pub const ALGORITHM_ID: &[u8] = b"EAP-NOOB";
 
+/// Completion-Exchange key derivation: build the FixedInfo and slice the
+/// 320-byte one-step-KDF output into the named keys (RFC 9140 §3.5, Table 5).
+pub fn derive_completion(z: &[u8], np: &[u8], ns: &[u8], noob: &[u8]) -> DerivedKeys {
+    let out = one_step_kdf_sha256(z, &eapnoob_fixed_info(np, ns, noob), EAPNOOB_OUTPUT_LEN);
+    DerivedKeys::from_output(&out).expect("320-byte output")
+}
+
 /// SP 800-56C one-step KDF with SHA-256.
 pub fn one_step_kdf_sha256(z: &[u8], fixed_info: &[u8], out_len: usize) -> Vec<u8> {
     let mut out = Vec::with_capacity(out_len);

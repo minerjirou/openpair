@@ -5,6 +5,7 @@
 //! * NIST SP 800-56C one-step KDF, SHA-256, 320-byte output -- [`kdf`]
 //! * HMAC-SHA256 MACs and SHA-256 Hoob/NoobId -- [`mac`]
 //! * wire messages with byte-confirmed field names, base64url -- [`messages`]
+//! * Server + Peer state machines (Types 1-6) -- [`machine`]
 //!
 //! Message sequence (byte-confirmed `Type` dispatch 1..=6):
 //! Discovery -> Negotiation -> KeyExchange -> Waiting -> NoobID -> Completion.
@@ -19,10 +20,12 @@
 
 pub mod kdf;
 pub mod mac;
+pub mod machine;
 pub mod messages;
 pub mod suite;
 
 pub use kdf::{one_step_kdf_sha256, DerivedKeys, EAPNOOB_OUTPUT_LEN};
+pub use machine::{Association, Outcome, Peer, Server, State};
 pub use messages::{MsgType, WireMessage};
 pub use suite::{Jwk, KeyPair, Suite};
 
