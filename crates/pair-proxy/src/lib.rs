@@ -14,7 +14,9 @@
 //! (model extraction, ingress envelope, candidate selection) with full tests.
 //! The hyper listener + mTLS peer client are wired in [`server`] (in progress).
 
+pub mod backend;
 pub mod ingress;
+pub mod ingress_server;
 pub mod model;
 pub mod peer;
 pub mod router;
