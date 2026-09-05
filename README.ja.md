@@ -92,6 +92,8 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 - [`docs/PROTOCOL.ja.md`](docs/PROTOCOL.ja.md) — 相互運用契約。各項目に **[confirmed]**
   または **[live]**（動的キャプチャで要確認）を付記。
+- [`docs/PAIRING.ja.md`](docs/PAIRING.ja.md) — クラスタ・ペアリング（EAP-NOOB）の全体像：
+  `/v1/cluster/pairing` のワイヤ契約・参加フロー・`openpair-node invite` / `join`。
 - [`docs/ROCM_E2E.ja.md`](docs/ROCM_E2E.ja.md) — 実 AMD/ROCm ハードでの検証手順。
 - [`docs/DYNAMIC_ANALYSIS_PLAN.ja.md`](docs/DYNAMIC_ANALYSIS_PLAN.ja.md) — 残る byte 厳密な
   `[live]` 項目の詰め方。

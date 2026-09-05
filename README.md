@@ -97,6 +97,9 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 - [`docs/PROTOCOL.md`](docs/PROTOCOL.md) — the interoperability contract, each
   item tagged **[confirmed]** or **[live]** (pending dynamic capture).
+- [`docs/PAIRING.md`](docs/PAIRING.md) — cluster pairing (EAP-NOOB) end to end:
+  the `/v1/cluster/pairing` wire contract, the join flow, and `openpair-node
+  invite` / `join`.
 - [`docs/ROCM_E2E.md`](docs/ROCM_E2E.md) — validating the AMD/ROCm path on real
   hardware.
 - [`docs/DYNAMIC_ANALYSIS_PLAN.md`](docs/DYNAMIC_ANALYSIS_PLAN.md) — how to close
