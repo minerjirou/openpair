@@ -13,6 +13,8 @@
 //!   OPENPAIR_PROXY_BIND   loopback proxy bind     (default: 127.0.0.1:11435)
 //!   OPENPAIR_NODEINFO_BIND node-info http bind    (default: 127.0.0.1:7071)
 //!   OPENPAIR_ADVERTISE_PORT mDNS advertised port  (default: 7443)
+//!   OPENPAIR_CLUSTER_DIR  reference-compatible trust dir (node.crt/node.key/trusted/)
+//!   OPENPAIR_INGRESS_BIND mTLS /ingress bind      (default: 0.0.0.0:7443)
 
 mod nodeinfo_server;
 mod trust;
@@ -43,8 +45,19 @@ async fn main() -> anyhow::Result<()> {
         env_or("OPENPAIR_NODEINFO_BIND", "127.0.0.1:7071").parse()?;
     let advertise_port: u16 = env_or("OPENPAIR_ADVERTISE_PORT", "7443").parse()?;
 
-    // 1. Identity (Ed25519 node cert; UUID lives in its SAN).
-    let identity = Identity::load_or_generate(&data_dir)?;
+    // 1. Identity + trust store.
+    //    Prefer a reference-compatible cluster dir (node.crt/node.key/trusted/)
+    //    so an openpair node can share a cluster directory with the reference;
+    //    otherwise fall back to a standalone identity in the data dir.
+    let (identity, pins): (Identity, pair_trust::SharedPins) =
+        if let Ok(cdir) = std::env::var("OPENPAIR_CLUSTER_DIR") {
+            let (id, store) = pair_trust::load_cluster_dir(&PathBuf::from(&cdir))?;
+            info!(dir = %cdir, pinned = store.len(), "loaded reference-compatible cluster dir");
+            (id, Arc::new(RwLock::new(store)))
+        } else {
+            let id = Identity::load_or_generate(&data_dir)?;
+            (id, Arc::new(RwLock::new(PeerPinStore::new())))
+        };
     let node_id = identity.node_uuid.clone();
     info!(node = %node_id, fingerprint = %identity.fingerprint(), "node identity ready");
 
@@ -73,7 +86,6 @@ async fn main() -> anyhow::Result<()> {
     //    Peer trust is normally established by pairing (EAP-NOOB). For local
     //    multi-node testing before that is byte-exact, an optional dev-trust
     //    directory lets nodes publish their cert and pin each other's.
-    let pins: pair_trust::SharedPins = Arc::new(RwLock::new(PeerPinStore::new()));
     if let Ok(dir) = std::env::var("OPENPAIR_TRUST_DIR") {
         match trust::bootstrap_dev_trust(&PathBuf::from(&dir), &identity, &pins) {
             Ok(n) => info!(dir = %dir, pinned = n, "dev-trust: published cert and pinned peers"),

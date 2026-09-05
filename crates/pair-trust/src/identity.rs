@@ -141,6 +141,30 @@ pub fn node_uuid_from_cert(der: &[u8]) -> Option<String> {
     None
 }
 
+impl Identity {
+    /// Reconstruct an identity from cert + key PEM (e.g. a cluster dir's
+    /// `node.crt` / `node.key`).
+    pub fn from_pem(cert_pem: &str, key_pem: &str) -> anyhow::Result<Self> {
+        let key_pair = rcgen::KeyPair::from_pem(key_pem)?;
+        let cert_der =
+            pem_cert_to_der(cert_pem).ok_or_else(|| anyhow::anyhow!("no CERTIFICATE block"))?;
+        let node_uuid = node_uuid_from_cert(&cert_der)
+            .ok_or_else(|| anyhow::anyhow!("cert missing urn:nvpair:node SAN"))?;
+        Ok(Self {
+            node_uuid,
+            cert_der,
+            key_pkcs8_der: key_pair.serialize_der(),
+            cert_pem: cert_pem.to_string(),
+            key_pem: key_pem.to_string(),
+        })
+    }
+}
+
+/// Extract DER from the first CERTIFICATE PEM block.
+pub fn pem_cert_to_der(pem: &str) -> Option<Vec<u8>> {
+    pem_to_der(pem)
+}
+
 fn pem_to_der(pem: &str) -> Option<Vec<u8>> {
     let mut b64 = String::new();
     let mut in_block = false;

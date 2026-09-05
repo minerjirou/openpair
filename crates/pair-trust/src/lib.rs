@@ -7,6 +7,7 @@
 //! * transport: TLS 1.3, mutual auth, peers accepted only if their DER is pinned
 //!   (mTLS config builders land in a follow-up once the rustls verifier is wired)
 
+pub mod cluster_dir;
 pub mod identity;
 pub mod mtls;
 pub mod pin;
@@ -14,6 +15,7 @@ pub mod uuid_scheme;
 
 pub use identity::{cert_fingerprint, node_uuid_from_cert, Identity};
 pub use mtls::{client_config, server_config, SharedPins};
+pub use cluster_dir::load_or_init as load_cluster_dir;
 pub use pin::{PeerPinStore, PinnedPeer};
 pub use uuid_scheme::{node_urn, uuid_from_urn, NODE_URN_PREFIX};
 
