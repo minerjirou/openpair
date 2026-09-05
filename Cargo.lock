@@ -735,9 +735,16 @@ name = "pair-node"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "pair-discovery",
  "pair-nodeinfo",
  "pair-proto",
+ "pair-proxy",
+ "pair-trust",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
