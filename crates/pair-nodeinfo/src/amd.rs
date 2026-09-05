@@ -17,8 +17,60 @@ use std::process::Command;
 
 const MB: u64 = 1_000_000; // amd-smi reports MB in decimal megabytes
 
-/// Detect AMD GPUs. Tries amd-smi, then rocm-smi; empty if neither is present.
+/// Detect AMD GPUs. Prefers the kernel `amdgpu` sysfs interface (no ROCm tools
+/// required — the reference approach), then falls back to amd-smi / rocm-smi for
+/// hosts where sysfs is unavailable (e.g. non-Linux).
 pub fn detect() -> Vec<Gpu> {
+    let sysfs = detect_sysfs();
+    if !sysfs.is_empty() {
+        return sysfs;
+    }
+    detect_tools()
+}
+
+/// Read AMD GPU telemetry straight from `amdgpu` sysfs. Works with just the
+/// kernel driver — VRAM total/used and busy% are exposed per DRM card:
+///   /sys/class/drm/card<N>/device/{vendor, device, mem_info_vram_total,
+///                                  mem_info_vram_used, gpu_busy_percent}
+pub fn detect_sysfs() -> Vec<Gpu> {
+    let base = std::path::Path::new("/sys/class/drm");
+    let entries = match std::fs::read_dir(base) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+    let mut gpus = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        // Match cardN (a whole card), not cardN-<connector>.
+        if !name.starts_with("card") || name.contains('-') {
+            continue;
+        }
+        let dev = entry.path().join("device");
+        let read = |f: &str| std::fs::read_to_string(dev.join(f)).ok().map(|s| s.trim().to_string());
+        // AMD PCI vendor id is 0x1002.
+        if read("vendor").as_deref() != Some("0x1002") {
+            continue;
+        }
+        let device_id = read("device").unwrap_or_default();
+        let vram_bytes = read("mem_info_vram_total").and_then(|s| s.parse::<u64>().ok());
+        let vram_used_bytes = read("mem_info_vram_used").and_then(|s| s.parse::<u64>().ok());
+        let utilization_percent = read("gpu_busy_percent").and_then(|s| s.parse::<u32>().ok());
+        gpus.push(Gpu {
+            uuid: read("unique_id").unwrap_or_else(|| name.clone()),
+            // Marketing names need a PCI-id database; report driver + device id.
+            name: format!("AMD GPU (amdgpu {device_id})"),
+            vendor: GpuVendor::Amd,
+            vendor_id: Some(0x1002),
+            vram_bytes,
+            vram_used_bytes,
+            utilization_percent,
+        });
+    }
+    gpus
+}
+
+/// Tool-based detection (amd-smi, then rocm-smi); empty if neither is present.
+pub fn detect_tools() -> Vec<Gpu> {
     if let (Some(stat), metric) = (
         run("amd-smi", &["static", "--json"]),
         run("amd-smi", &["metric", "--json"]),
