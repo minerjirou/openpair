@@ -799,10 +799,12 @@ dependencies = [
  "hyper-util",
  "pair-proto",
  "pair-trust",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-rustls",
  "tracing",
 ]
 

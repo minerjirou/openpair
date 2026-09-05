@@ -16,6 +16,7 @@
 
 pub mod ingress;
 pub mod model;
+pub mod peer;
 pub mod router;
 pub mod server;
 

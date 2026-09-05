@@ -18,3 +18,5 @@ bytes = "1"
 hyper = { version = "1", features = ["server", "client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 http-body-util = "0.1"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls-pki-types = "1"
