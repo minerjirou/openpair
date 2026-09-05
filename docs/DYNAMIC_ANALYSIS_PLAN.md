@@ -7,6 +7,36 @@ serializations that can only be confirmed by observing the running reference.
 This plan captures exactly what to observe and how, so byte-exact interop can be
 finished with a small, targeted effort.
 
+## Progress (live capture, this session)
+
+Confirmed by running the reference workers directly:
+- **#6 certificate profile — DONE.** Ed25519 self-signed; Subject/Issuer
+  `CN=<node-uuid>`; SAN `DNS:<hostname>` + `URI:urn:nvpair:node:<uuid>`;
+  KeyUsage=DigitalSignature (critical); EKU server+client; BasicConstraints
+  CA:FALSE (critical); 128-bit serial; validity now..+2y. `pair-trust` now emits
+  a byte-shape-matching certificate.
+- **#4 mDNS TXT + advertisement — DONE.** TXT keys `v=1` / `uuid` / `ip`
+  (+`cluster-uuid` when clustered); SRV port = the node-info port. Node objects:
+  `discovery:node-discovered` → `{hostUuid,name,ip,ips,trusted,services,lastSeen}`;
+  `nodes:changed` → `{id,nodeUuid,name,ipAddress,port,clusterId,admissionEpoch,state,joinedAt,lastSeen}`
+  (modelled as `NodeAdvert` / `ClusterMember`).
+- **Pairing transport — confirmed.** POST to **`/v1/cluster/pairing`** (plain
+  HTTP, phased; out-of-order phase → `409 phase does not match session state`).
+- Method shapes: `cluster:invite-node {address}` → `{inviteId,state}`;
+  `ready {version}`; `discovery:subscribe {services}`; `cluster:identity-changed
+  {clusterId,clusterFriendlyName}`.
+
+**Still open (#1/#2/#3/#5/#7):** the byte-exact EAP-NOOB MAC/KDF details and
+endorsement/tombstone require a **completed** pairing. Completion needs the
+two-sided out-of-band step — A creates an invite (code/PIN), B accepts it
+(`cluster:respond-to-invite`), then the `/v1/cluster/pairing` phases run to
+NoobID/Completion. Driving that blind from the CLI hits the 409 phase gate; it is
+normally GUI-orchestrated. Capturing it needs either the GUI (or a scripted
+invite-code + respond-to-invite round-trip) plus a plain-HTTP logging proxy on
+the pairing port.
+
+---
+
 ## What still needs confirmation
 1. **EAP-NOOB MACs/MACp association array** — the ordered element list HMAC'd
    with Kms/Kmp (RFC 9140 §3.3.2): element order, raw-vs-JSON-quoted per field,

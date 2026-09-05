@@ -11,9 +11,10 @@ software. Confidence is marked **[confirmed]** (statically determined) or
 
 ## 1. Discovery — mDNS / DNS-SD
 - Service type **`_nvpair-node._tcp`** [confirmed].
-- Node metadata in the service **TXT** record. Cluster id key `cluster-uuid`
-  [confirmed]; node-uuid/host/port/addresses keys [confirmed names, exact set
-  live]. Unknown keys are preserved on round-trip.
+- Service **TXT** keys **[confirmed by live capture]**: `v=1`, `uuid=<node-uuid>`,
+  `ip=<addr>`, plus `cluster-uuid` once the node has joined a cluster. The SRV
+  record's port is the **node-info port** (where `GET /v1/node-info` is served).
+  Unknown keys are preserved on round-trip.
 
 ## 2. Supervisor IPC — JSON-RPC 2.0 over stdio
 - Framing: **newline-delimited JSON** (one compact object per `\n` line)
@@ -46,9 +47,11 @@ Per GPU: `vram_bytes`, `vram_used_bytes`, `utilization_percent`, `vendor`,
 
 ## 4. Cluster security
 - **Identity** [confirmed]: Ed25519 self-signed X.509 leaf; SAN URI
-  `urn:nvpair:node:<uuid>`; EKU serverAuth+clientAuth; 128-bit random serial;
-  fingerprint `sha256:<hex-of-DER>`. Cluster UUID is a random-minted id.
-  (Subject O/OU/CN and validity window: [live].)
+  `urn:nvpair:node:<uuid>` **plus a DNS SAN of the hostname**; EKU
+  serverAuth+clientAuth; KeyUsage=DigitalSignature (critical); BasicConstraints
+  CA:FALSE (critical); 128-bit random serial; **validity = now .. +2 years**;
+  Subject/Issuer `CN=<node-uuid>`; fingerprint `sha256:<hex-of-DER>`. Cluster
+  UUID is a random-minted id. **[all confirmed by reading a reference cert]**
 - **Transport** [confirmed]: TLS 1.3 only; mutual auth mandatory; trust is by
   **pinned raw certificate DER** (a peer's SAN UUID is validated before pinning).
 - **Membership** [confirmed alg]: Ed25519 signatures over newline-joined,
@@ -62,11 +65,18 @@ Per GPU: `vram_bytes`, `vram_used_bytes`, `utilization_percent`, `vendor`,
   `algorithm-id = "EAP-NOOB"`, `FixedInfo = "EAP-NOOB" ‖ Np ‖ Ns ‖ Noob`,
   320-byte output → MSK/EMSK/AMSK/MethodId/Kms/Kmp/Kz. All binary fields are
   base64url (no padding).
+- Transport [confirmed by live capture]: pairing is a **phased** exchange POSTed
+  to **`/v1/cluster/pairing`** over plain HTTP (before mTLS trust exists); an
+  out-of-order phase returns `409 phase does not match session state`.
 - Message sequence [confirmed]: `Type` 1..6 =
   Discovery → Negotiation → KeyExchange → Waiting → NoobID → Completion.
 - **[live]**: the `Np`/`Ns` ordering inside FixedInfo, the 320-byte split
-  offsets, and the exact MACs/MACp association-data array assembly. `openpair`
-  implements the primitives and abstracts these behind clearly-marked seams.
+  offsets, and the exact MACs/MACp association-data array assembly. These require
+  a **completed** pairing, which needs the two-sided invite-code + PIN
+  out-of-band exchange (GUI-orchestrated: A `cluster:invite-node {address}` →
+  invite code → B `cluster:respond-to-invite` → the `/v1/cluster/pairing`
+  exchange proceeds). `openpair` implements the primitives behind clearly-marked
+  seams.
 
 ---
 All of §1–§5 that is **[confirmed]** is implemented and unit/integration-tested

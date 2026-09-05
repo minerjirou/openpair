@@ -12,7 +12,7 @@
 //!   OPENPAIR_BACKEND      local engine authority  (default: 127.0.0.1:11434)
 //!   OPENPAIR_PROXY_BIND   loopback proxy bind     (default: 127.0.0.1:11435)
 //!   OPENPAIR_NODEINFO_BIND node-info http bind    (default: 127.0.0.1:7071)
-//!   OPENPAIR_ADVERTISE_PORT mDNS advertised port  (default: 7443)
+//!   OPENPAIR_ADVERTISE_PORT mDNS advertised port  (default: the node-info port)
 //!   OPENPAIR_CLUSTER_DIR  reference-compatible trust dir (node.crt/node.key/trusted/)
 //!   OPENPAIR_INGRESS_BIND mTLS /ingress bind      (default: 0.0.0.0:7443)
 
@@ -68,7 +68,6 @@ async fn main() -> anyhow::Result<()> {
         env_or("OPENPAIR_PROXY_BIND", "127.0.0.1:11435").parse()?;
     let nodeinfo_bind: std::net::SocketAddr =
         env_or("OPENPAIR_NODEINFO_BIND", "127.0.0.1:7071").parse()?;
-    let advertise_port: u16 = env_or("OPENPAIR_ADVERTISE_PORT", "7443").parse()?;
 
     // 1. Identity + trust store.
     //    Prefer a reference-compatible cluster dir (node.crt/node.key/trusted/)
@@ -201,16 +200,25 @@ async fn main() -> anyhow::Result<()> {
     info!(%proxy_bind, backend = %backend, "cluster-aware Ollama/OpenAI proxy up");
 
     // 6. Discovery: advertise + browse -> populate the routing table.
+    //    Confirmed from a reference advertisement: the SRV port is the node-info
+    //    port (peers fetch /v1/node-info from it), and the TXT carries
+    //    v=1 / uuid=<node> / ip=<addr>. OPENPAIR_ADVERTISE_PORT overrides.
     let discovery = Discovery::new()?;
+    let local_ip = local_ip();
     let record = NodeRecord {
         node_uuid: Some(node_id.clone()),
+        addresses: local_ip.iter().cloned().collect(),
         ..Default::default()
     };
+    let advertise_port = std::env::var("OPENPAIR_ADVERTISE_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| nodeinfo_bind.port());
     let host = hostname();
     if let Err(e) = discovery.advertise(&node_id, &host, advertise_port, &record) {
         warn!(error = %e, "advertise failed");
     } else {
-        info!(port = advertise_port, "advertising _nvpair-node._tcp");
+        info!(port = advertise_port, ip = ?local_ip, "advertising _nvpair-node._tcp");
     }
     let peers = discovery.browse()?;
     {
@@ -243,6 +251,14 @@ async fn main() -> anyhow::Result<()> {
     info!("shutting down");
     let _ = discovery.daemon().shutdown();
     Ok(())
+}
+
+/// Best-effort primary (outbound) IPv4 of this host, for the mDNS `ip` TXT.
+fn local_ip() -> Option<String> {
+    let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    // No packet is sent; connect just selects a source address.
+    sock.connect("8.8.8.8:80").ok()?;
+    sock.local_addr().ok().map(|a| a.ip().to_string())
 }
 
 fn hostname() -> String {

@@ -16,6 +16,6 @@ pub mod discovery;
 pub mod jsonrpc;
 pub mod telemetry;
 
-pub use discovery::{NodeRecord, MDNS_SERVICE_TYPE};
+pub use discovery::{ClusterMember, NodeAdvert, NodeRecord, MDNS_SERVICE_TYPE};
 pub use jsonrpc::{RpcError, RpcId, RpcMessage, RpcNotification, RpcRequest, RpcResponse};
 pub use telemetry::{Cpu, Gpu, GpuVendor, MemoryInfo, NodeInfo};

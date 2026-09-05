@@ -106,11 +106,19 @@ impl Discovery {
 fn record_to_txt(record: &NodeRecord) -> HashMap<String, String> {
     use pair_proto::contract::txt_keys;
     let mut props = HashMap::new();
+    // Reference advertises v=1, uuid=<node-uuid>, ip=<addr>, plus cluster-uuid
+    // once clustered.
+    props.insert(txt_keys::VERSION.to_string(), "1".to_string());
     if let Some(u) = &record.node_uuid {
         props.insert(txt_keys::NODE_UUID.to_string(), u.clone());
     }
     if let Some(c) = &record.cluster_uuid {
         props.insert(txt_keys::CLUSTER_UUID.to_string(), c.clone());
+    }
+    if let Some(ip) = record.addresses.first() {
+        // Advertise the primary IP (strip any :port).
+        let ip = ip.split(':').next().unwrap_or(ip);
+        props.insert(txt_keys::IP.to_string(), ip.to_string());
     }
     for (k, v) in &record.extra {
         props.insert(k.clone(), v.clone());
@@ -144,7 +152,7 @@ mod tests {
             ..Default::default()
         };
         let props = record_to_txt(&rec);
-        assert_eq!(props.get("nodeUuid").map(String::as_str), Some("n-1"));
+        assert_eq!(props.get("uuid").map(String::as_str), Some("n-1"));
         assert_eq!(props.get("cluster-uuid").map(String::as_str), Some("c-1"));
     }
 }

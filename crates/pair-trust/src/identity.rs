@@ -48,29 +48,39 @@ impl Identity {
         let key_pair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519)?;
 
         let mut params = rcgen::CertificateParams::new(Vec::<String>::new())?;
-        // SAN: URI urn:nvpair:node:<uuid>
+        // SAN: DNS:<hostname> + URI:urn:nvpair:node:<uuid> (order + shape
+        // confirmed by reading a reference-minted certificate).
+        params
+            .subject_alt_names
+            .push(rcgen::SanType::DnsName(rcgen::Ia5String::try_from(
+                hostname(),
+            )?));
         params
             .subject_alt_names
             .push(rcgen::SanType::URI(rcgen::Ia5String::try_from(node_urn(
                 node_uuid,
             ))?));
-        // EKU: server + client auth (mutual TLS both directions).
+        // Subject/Issuer: CN = node UUID (self-signed).
+        params
+            .distinguished_name
+            .push(rcgen::DnType::CommonName, node_uuid);
+        // Key usage: critical, Digital Signature.
+        params.key_usages = vec![rcgen::KeyUsagePurpose::DigitalSignature];
+        // Extended key usage: server + client auth (mutual TLS both directions).
         params.extended_key_usages = vec![
             rcgen::ExtendedKeyUsagePurpose::ServerAuth,
             rcgen::ExtendedKeyUsagePurpose::ClientAuth,
         ];
+        // Basic constraints: critical, CA:FALSE.
+        params.is_ca = rcgen::IsCa::ExplicitNoCa;
         // 128-bit random serial.
         let mut serial = [0u8; 16];
         rand::thread_rng().fill_bytes(&mut serial);
         params.serial_number = Some(rcgen::SerialNumber::from_slice(&serial));
-        // Minimal subject; a CN is set to the node UUID (Subject fields pending
-        // dynamic confirmation).
-        params
-            .distinguished_name
-            .push(rcgen::DnType::CommonName, node_uuid);
-        // Wide validity window (exact window pending confirmation).
-        params.not_before = rcgen::date_time_ymd(2025, 1, 1);
-        params.not_after = rcgen::date_time_ymd(2035, 1, 1);
+        // Validity: now .. now + 2 years (confirmed from a reference certificate).
+        let now = time::OffsetDateTime::now_utc();
+        params.not_before = now;
+        params.not_after = now + time::Duration::days(730);
 
         let cert = params.self_signed(&key_pair)?;
         let cert_der = cert.der().as_ref().to_vec();
@@ -171,6 +181,21 @@ impl Identity {
 /// Extract DER from the first CERTIFICATE PEM block.
 pub fn pem_cert_to_der(pem: &str) -> Option<Vec<u8>> {
     pem_to_der(pem)
+}
+
+/// The local hostname, for the certificate's DNS SAN. Falls back to a stable
+/// label if it cannot be determined.
+fn hostname() -> String {
+    std::env::var("COMPUTERNAME")
+        .ok()
+        .or_else(|| std::env::var("HOSTNAME").ok())
+        .or_else(|| {
+            std::fs::read_to_string("/etc/hostname")
+                .ok()
+                .map(|s| s.trim().to_string())
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "openpair-node".to_string())
 }
 
 fn pem_to_der(pem: &str) -> Option<Vec<u8>> {

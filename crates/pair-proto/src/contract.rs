@@ -93,16 +93,21 @@ pub mod endpoints {
     pub const PEERSYNC: &str = "/peersync";
 }
 
-/// Confirmed mDNS TXT keys carried in the `_nvpair-node._tcp` service record.
+/// mDNS TXT keys carried in the `_nvpair-node._tcp` service record.
+///
+/// Captured live from a reference advertisement: `v=1`, `uuid=<node-uuid>`,
+/// `ip=<addr>`. The SRV record's port is the node-info port (where
+/// `GET /v1/node-info` is served), not the cluster ingress port. `cluster-uuid`
+/// is expected only once the node has joined a cluster.
 pub mod txt_keys {
-    pub const NODE_UUID: &str = "nodeUuid";
-    pub const CLUSTER_UUID: &str = "cluster-uuid"; // byte-verified in ClusterUUIDFromTXT
-    pub const HOSTNAME: &str = "hostname";
-    pub const DOMAIN: &str = "domain";
-    pub const PORT: &str = "port";
-    pub const ADDRESSES: &str = "addresses";
-    pub const SERVICE: &str = "service";
-    pub const TTL: &str = "ttl";
+    /// TXT record version (observed `v=1`).
+    pub const VERSION: &str = "v";
+    /// Node UUID (observed key is `uuid`, not `nodeUuid`).
+    pub const NODE_UUID: &str = "uuid";
+    /// Primary advertised IP.
+    pub const IP: &str = "ip";
+    /// Cluster UUID (byte-verified in ClusterUUIDFromTXT; present when clustered).
+    pub const CLUSTER_UUID: &str = "cluster-uuid";
 }
 
 #[cfg(test)]
@@ -113,6 +118,7 @@ mod tests {
         assert_eq!(methods::NODE_SET_PRIORITY, "node/set-priority");
         assert_eq!(endpoints::INGRESS, "/ingress");
         assert_eq!(endpoints::NODE_INFO, "/v1/node-info");
-        assert_eq!(txt_keys::NODE_UUID, "nodeUuid");
+        assert_eq!(txt_keys::NODE_UUID, "uuid");
+        assert_eq!(txt_keys::VERSION, "v");
     }
 }
