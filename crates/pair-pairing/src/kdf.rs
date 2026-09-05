@@ -30,26 +30,27 @@ pub fn one_step_kdf_sha256(z: &[u8], fixed_info: &[u8], out_len: usize) -> Vec<u
     out
 }
 
-/// Build EAP-NOOB FixedInfo = "EAP-NOOB" || Np || Ns || Noob.
+/// Build the Completion-Exchange FixedInfo (RFC 9140 §3.5, Table 4):
+/// `AlgorithmId("EAP-NOOB") || PartyUInfo(Np) || PartyVInfo(Ns) ||
+/// SuppPrivInfo(Datalen=len(Noob) as one byte, Noob)`.
 ///
-/// TODO(interop, needs dynamic confirmation): the Np/Ns concatenation order and
-/// whether any length prefixes are present. The algorithm-id and constituents
-/// are byte-confirmed; the exact ordering is pinned here per the strongest
-/// static reading and must be validated against a live handshake.
+/// Confirmed against the upstream implementation (Apache-2.0): PartyUInfo is the
+/// peer nonce Np, PartyVInfo is the server nonce Ns, and SuppPrivInfo carries a
+/// one-byte length prefix before Noob.
 pub fn eapnoob_fixed_info(np: &[u8], ns: &[u8], noob: &[u8]) -> Vec<u8> {
-    let mut fi = Vec::with_capacity(ALGORITHM_ID.len() + np.len() + ns.len() + noob.len());
+    let mut fi = Vec::with_capacity(ALGORITHM_ID.len() + np.len() + ns.len() + 1 + noob.len());
     fi.extend_from_slice(ALGORITHM_ID);
     fi.extend_from_slice(np);
     fi.extend_from_slice(ns);
+    fi.push(noob.len() as u8); // SuppPrivInfo one-byte Datalen counter
     fi.extend_from_slice(noob);
     fi
 }
 
 /// The 320-byte EAP-NOOB output, split into named keys.
 ///
-/// TODO(interop, needs dynamic confirmation): exact per-key offsets/lengths.
-/// RFC 9140 orders MSK(64) EMSK(64) AMSK(64) MethodId(32) Kms(32) Kmp(32) Kz(32)
-/// = 320; that ordering is applied here pending live confirmation.
+/// Offsets confirmed (RFC 9140 Table 5 + upstream): MSK(64) EMSK(64) AMSK(64)
+/// MethodId(32) Kms(32) Kmp(32) Kz(32) = 320.
 #[derive(Debug, Clone)]
 pub struct DerivedKeys {
     pub msk: [u8; 64],

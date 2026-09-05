@@ -26,6 +26,19 @@ pub struct Identity {
     pub key_pkcs8_der: Vec<u8>,
     pub cert_pem: String,
     pub key_pem: String,
+    /// The Ed25519 private seed, for signing membership endorsements/tombstones.
+    signing_seed: [u8; 32],
+}
+
+impl Identity {
+    /// This node's Ed25519 signing key (for membership signatures).
+    pub fn signing_key(&self) -> ed25519_dalek::SigningKey {
+        ed25519_dalek::SigningKey::from_bytes(&self.signing_seed)
+    }
+    /// This node's Ed25519 verifying (public) key.
+    pub fn verifying_key(&self) -> ed25519_dalek::VerifyingKey {
+        self.signing_key().verifying_key()
+    }
 }
 
 impl std::fmt::Debug for Identity {
@@ -45,7 +58,13 @@ impl Identity {
 
     /// Mint an identity for a specific node UUID.
     pub fn generate_with_uuid(node_uuid: &str) -> anyhow::Result<Self> {
-        let key_pair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519)?;
+        // Source the Ed25519 key from ed25519-dalek so we can also use it for
+        // membership signatures, then hand its PKCS#8 to rcgen for the cert.
+        use ed25519_dalek::pkcs8::EncodePrivateKey;
+        let signing = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+        let signing_seed = signing.to_bytes();
+        let pkcs8 = signing.to_pkcs8_der()?;
+        let key_pair = rcgen::KeyPair::try_from(pkcs8.as_bytes())?;
 
         let mut params = rcgen::CertificateParams::new(Vec::<String>::new())?;
         // SAN: DNS:<hostname> + URI:urn:nvpair:node:<uuid> (order + shape
@@ -94,6 +113,7 @@ impl Identity {
             key_pkcs8_der,
             cert_pem,
             key_pem,
+            signing_seed,
         })
     }
 
@@ -117,18 +137,7 @@ impl Identity {
         if key_path.exists() && cert_path.exists() {
             let key_pem = std::fs::read_to_string(&key_path)?;
             let cert_pem = std::fs::read_to_string(&cert_path)?;
-            let key_pair = rcgen::KeyPair::from_pem(&key_pem)?;
-            let cert_der = pem_to_der(&cert_pem)
-                .ok_or_else(|| anyhow::anyhow!("no CERTIFICATE block in {cert_path:?}"))?;
-            let node_uuid = node_uuid_from_cert(&cert_der)
-                .ok_or_else(|| anyhow::anyhow!("cert missing urn:nvpair:node SAN"))?;
-            Ok(Self {
-                node_uuid,
-                cert_der,
-                key_pkcs8_der: key_pair.serialize_der(),
-                cert_pem,
-                key_pem,
-            })
+            Self::from_pem(&cert_pem, &key_pem)
         } else {
             let id = Self::generate()?;
             id.save(dir)?;
@@ -168,12 +177,15 @@ impl Identity {
             pem_cert_to_der(cert_pem).ok_or_else(|| anyhow::anyhow!("no CERTIFICATE block"))?;
         let node_uuid = node_uuid_from_cert(&cert_der)
             .ok_or_else(|| anyhow::anyhow!("cert missing urn:nvpair:node SAN"))?;
+        use ed25519_dalek::pkcs8::DecodePrivateKey;
+        let signing_seed = ed25519_dalek::SigningKey::from_pkcs8_pem(key_pem)?.to_bytes();
         Ok(Self {
             node_uuid,
             cert_der,
             key_pkcs8_der: key_pair.serialize_der(),
             cert_pem: cert_pem.to_string(),
             key_pem: key_pem.to_string(),
+            signing_seed,
         })
     }
 }

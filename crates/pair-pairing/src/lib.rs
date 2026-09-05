@@ -11,10 +11,11 @@
 //! The out-of-band value (`Noob`, delivered via the PIN channel) plus the ECDH
 //! `Z` feed the KDF; `Kms`/`Kmp` key the confirmation MACs.
 //!
-//! Remaining dynamic-analysis items before full interop (see per-item TODOs):
-//! the KDF FixedInfo Np/Ns ordering, the 320-byte split offsets, and the exact
-//! MACs/MACp association-data array assembly. The cryptography is in place; only
-//! these byte-exact serializations need confirmation against a live peer.
+//! Byte-exact serializations confirmed against the upstream implementation
+//! (Apache-2.0): the KDF FixedInfo (`"EAP-NOOB" || Np || Ns || len(Noob) ||
+//! Noob`), the 320-byte output split, and the 17-element MACs/MACp/Hoob
+//! association array. The reconnect exchange (KeyingMode 3, Kz) is not yet
+//! modelled.
 
 pub mod kdf;
 pub mod mac;
@@ -102,10 +103,12 @@ mod tests {
         assert_eq!(ks.kms, kp.kms);
         assert_eq!(ks.kz, kp.kz);
 
-        let assoc = b"<association-data placeholder>";
+        // Both sides compute the confirmation MAC (MACs, lead=2) over the same
+        // association inputs with the derived Kms.
+        let inputs = mac::MacInputs::default();
         assert!(mac::mac_equal(
-            &mac::compute_mac(&ks.kms, assoc),
-            &mac::compute_mac(&kp.kms, assoc)
+            &mac::compute_mac(&ks.kms, 2, &inputs),
+            &mac::compute_mac(&kp.kms, 2, &inputs)
         ));
     }
 }

@@ -70,13 +70,17 @@ Per GPU: `vram_bytes`, `vram_used_bytes`, `utilization_percent`, `vendor`,
   out-of-order phase returns `409 phase does not match session state`.
 - Message sequence [confirmed]: `Type` 1..6 =
   Discovery → Negotiation → KeyExchange → Waiting → NoobID → Completion.
-- **[live]**: the `Np`/`Ns` ordering inside FixedInfo, the 320-byte split
-  offsets, and the exact MACs/MACp association-data array assembly. These require
-  a **completed** pairing, which needs the two-sided invite-code + PIN
-  out-of-band exchange (GUI-orchestrated: A `cluster:invite-node {address}` →
-  invite code → B `cluster:respond-to-invite` → the `/v1/cluster/pairing`
-  exchange proceeds). `openpair` implements the primitives behind clearly-marked
-  seams.
+- **[confirmed from upstream source (Apache-2.0)]**: FixedInfo =
+  `"EAP-NOOB" || Np || Ns || len(Noob) as one byte || Noob`; 320-byte split =
+  MSK(64) EMSK(64) AMSK(64) MethodId(32) Kms(32) Kmp(32) Kz(32); MAC/Hoob input =
+  a 17-element compact JSON array `[lead, Vers, Verp, PeerId, Cryptosuites, Dirs,
+  ServerInfo, Cryptosuitep, Dirp, NAI, PeerInfo, 0, PKs, Ns, PKp, Np, Noob]`
+  (lead: MACs=2, MACp=1, Hoob=dir), HMAC-SHA256[:32] / SHA-256[:16]; NoobId =
+  H(["NoobId", Noob])[:16]. Membership: Ed25519 over
+  `nvpair-endorse:v2
+…` / `nvpair-remove:v2
+…` newline-joined payloads,
+  base64 signature. Only the reconnect exchange (KeyingMode 3, Kz) is unmodelled.
 
 ---
 All of §1–§5 that is **[confirmed]** is implemented and unit/integration-tested

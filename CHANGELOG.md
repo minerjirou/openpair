@@ -31,6 +31,11 @@ yet made a tagged release.
   and the `docs/` guides, cross-linked with the English versions.
 
 ### Changed
+- Finalized the EAP-NOOB byte-exact serializations and cluster membership from
+  the Apache-2.0 upstream source: KDF FixedInfo (Noob length prefix), 320-byte
+  split, the 17-element MAC/Hoob JSON association array, and Ed25519
+  endorsement/tombstone payloads (`pair-trust::membership`). Node identity now
+  sources its Ed25519 key so it can also sign membership records.
 - Relicensing/attribution: the upstream **NVIDIA Personal AI Router** is
   Apache-2.0 open source (https://github.com/NVIDIA/Personal-AI-Router). Docs
   updated from a "clean-room / reverse-engineered" framing to an independent,

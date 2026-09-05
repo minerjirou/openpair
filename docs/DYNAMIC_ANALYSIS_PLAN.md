@@ -7,6 +7,26 @@ serializations that can only be confirmed by observing the running reference.
 This plan captures exactly what to observe and how, so byte-exact interop can be
 finished with a small, targeted effort.
 
+
+## Resolved from the upstream source (Apache-2.0)
+
+The upstream project is open source (https://github.com/NVIDIA/Personal-AI-Router),
+so the remaining byte-exact items were read directly from `services/eap-noob/`
+and `services/nvpair-cluster-manager/`, not dynamically captured:
+- **#2 / #3 KDF** (`services/eap-noob/kdf.go`): FixedInfo =
+  `"EAP-NOOB" || Np || Ns || len(Noob) as one byte || Noob`; output split
+  MSK(64)/EMSK(64)/AMSK(64)/MethodId(32)/Kms(32)/Kmp(32)/Kz(32). Implemented.
+- **#1 MAC/Hoob** (`services/eap-noob/mac.go`): the 17-element compact JSON
+  association array; MACs lead=2 (Kms), MACp lead=1 (Kmp); HMAC-SHA256[:32];
+  Hoob=SHA-256[:16]; NoobId=H(["NoobId",Noob])[:16]. Implemented.
+- **#5 endorsement / tombstone** (`services/nvpair-cluster-manager/endorsement.go`):
+  Ed25519 over `nvpair-endorse:v{1,2}` / `nvpair-remove:v{1,2}` newline-joined
+  payloads, base64 signature; struct fields confirmed. Implemented in
+  `pair-trust::membership`.
+- **#6 certificate** — implemented and openssl-verified (see below).
+- **#7 reconnect (KeyingMode 3, Kz)** remains unmodelled (future work).
+
+---
 ## Progress (live capture, this session)
 
 Confirmed by running the reference workers directly:
