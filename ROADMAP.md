@@ -48,7 +48,7 @@ proprietary code, binaries, or decompiler output are committed. See `NOTICE`.
 - `/v1/node-info` wire shape confirmed and matched: GPU `{name, vram_bytes,
   vram_used_bytes?, utilization_percent?}`, `cpu {name, cores}`, `memory
   {total_bytes}`, `telemetryValid`, `msSince`, `hostUuid`. [done]
-- Gap: AMD GPU **static inventory** must come from the OS (ghw/WMI/sysfs), not
-  only `amd-smi`/`rocm-smi` — reference enumerates an AMD iGPU with no ROCm
-  tools present. [todo: pair-nodeinfo OS GPU inventory]
-- Gap: CPU/memory detection is `/proc`-only (Linux); add Windows/macOS. [todo]
+- AMD GPU static inventory now via OS (Windows WMI / macOS system_profiler /
+  Linux amdgpu sysfs) — AMD iGPU enumerated with no ROCm tools (live-verified on
+  Windows). `--gpucheck` self-check added. Real ROCm-compute E2E: see docs/ROCM_E2E.md. [done, HW-validate pending]
+- CPU/memory detection now portable (sysinfo: Windows/macOS/Linux) — live-verified on Windows. [done]

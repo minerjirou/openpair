@@ -30,8 +30,32 @@ fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
+/// Print which GPUs each detection backend found, then exit. Use on a real
+/// AMD/ROCm host to validate the AMD path end to end.
+fn gpu_check() {
+    let show = |label: &str, gpus: Vec<pair_proto::Gpu>| {
+        println!("[{label}] {} GPU(s)", gpus.len());
+        for g in gpus {
+            println!(
+                "  - {:?} {}  vram={:?} used={:?} util={:?}",
+                g.vendor, g.name, g.vram_bytes, g.vram_used_bytes, g.utilization_percent
+            );
+        }
+    };
+    show("nvidia-smi", pair_nodeinfo::nvidia::detect());
+    show("amdgpu-sysfs", pair_nodeinfo::amd::detect_sysfs());
+    show("amd-smi/rocm-smi", pair_nodeinfo::amd::detect_tools());
+    show("os-inventory", pair_nodeinfo::gpu_os::os_gpus());
+    println!("[merged] used by the node:");
+    show("detect_gpus", pair_nodeinfo::detect_gpus());
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if std::env::args().any(|a| a == "--gpucheck") {
+        gpu_check();
+        return Ok(());
+    }
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
