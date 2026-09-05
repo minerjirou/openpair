@@ -15,11 +15,13 @@
 //!   OPENPAIR_ADVERTISE_PORT mDNS advertised port  (default: 7443)
 
 mod nodeinfo_server;
+mod trust;
 
 use pair_discovery::Discovery;
 use pair_proto::NodeRecord;
-use pair_trust::Identity;
+use pair_trust::{Identity, PeerPinStore};
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 use tracing::{info, warn};
 
 fn env_or(key: &str, default: &str) -> String {
@@ -67,7 +69,34 @@ async fn main() -> anyhow::Result<()> {
     });
     info!(%nodeinfo_bind, "serving GET /v1/node-info");
 
-    // 4. Local reverse proxy (loopback -> local engine).
+    // 4. Cluster trust + mTLS /ingress receiver.
+    //    Peer trust is normally established by pairing (EAP-NOOB). For local
+    //    multi-node testing before that is byte-exact, an optional dev-trust
+    //    directory lets nodes publish their cert and pin each other's.
+    let pins: pair_trust::SharedPins = Arc::new(RwLock::new(PeerPinStore::new()));
+    if let Ok(dir) = std::env::var("OPENPAIR_TRUST_DIR") {
+        match trust::bootstrap_dev_trust(&PathBuf::from(&dir), &identity, &pins) {
+            Ok(n) => info!(dir = %dir, pinned = n, "dev-trust: published cert and pinned peers"),
+            Err(e) => warn!(error = %e, "dev-trust bootstrap failed"),
+        }
+    }
+    let ingress_bind: std::net::SocketAddr =
+        env_or("OPENPAIR_INGRESS_BIND", "0.0.0.0:7443").parse()?;
+    let ing_id = identity.clone();
+    let ing_pins = pins.clone();
+    let ing_backend = backend.clone();
+    tokio::spawn(async move {
+        if let Err(e) = pair_proxy::ingress_server::serve_ingress(
+            ingress_bind, &ing_id, ing_pins, ing_backend, std::future::pending(),
+        )
+        .await
+        {
+            warn!(error = %e, "ingress receiver exited");
+        }
+    });
+    info!(%ingress_bind, "serving mutual-TLS /ingress for peers");
+
+    // 5. Local reverse proxy (loopback -> local engine).
     let backend_for_proxy = backend.clone();
     tokio::spawn(async move {
         if let Err(e) =
@@ -78,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
     });
     info!(%proxy_bind, backend = %backend, "loopback Ollama/OpenAI proxy up");
 
-    // 5. Discovery: advertise + browse.
+    // 6. Discovery: advertise + browse.
     let discovery = Discovery::new()?;
     let mut record = NodeRecord::default();
     record.node_uuid = Some(node_id.clone());
