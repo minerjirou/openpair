@@ -759,6 +759,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "pair-cluster"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "bytes",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "pair-pairing",
+ "pair-proto",
+ "pair-trust",
+ "rand",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "pair-discovery"
 version = "0.1.0"
 dependencies = [
@@ -780,8 +802,10 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "pair-cluster",
  "pair-discovery",
  "pair-nodeinfo",
+ "pair-pairing",
  "pair-proto",
  "pair-proxy",
  "pair-trust",

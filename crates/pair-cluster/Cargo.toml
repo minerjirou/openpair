@@ -1,0 +1,27 @@
+[package]
+name = "pair-cluster"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cluster pairing transport: PairingInfo, the /v1/cluster/pairing envelope, and the EAP-NOOB join/invite drivers over HTTP"
+
+[dependencies]
+pair-proto = { path = "../pair-proto" }
+pair-pairing = { path = "../pair-pairing" }
+pair-trust = { path = "../pair-trust" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+base64 = "0.22"
+bytes = "1"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+hyper = { version = "1", features = ["server", "client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }

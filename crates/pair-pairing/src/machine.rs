@@ -13,6 +13,29 @@ use crate::suite::{Jwk, KeyPair, Suite};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
+/// EAP-NOOB error notification codes (RFC 9140 §3.6.4), byte-confirmed against
+/// the upstream implementation. Only the codes this port emits/classifies are
+/// listed.
+pub mod error_code {
+    pub const INVALID_DATA: i64 = 1003;
+    pub const UNEXPECTED_PEER_ID: i64 = 2001;
+    pub const STATE_MISMATCH: i64 = 2002;
+    /// Invalid ECDHE key / unrecognized NoobId -- the wrong-PIN signature.
+    pub const UNRECOGNIZED_OOB_MSG_ID: i64 = 2003;
+    pub const UNSUPPORTED_VERSION: i64 = 3001;
+    pub const UNSUPPORTED_CRYPTOSUITE: i64 = 3002;
+    pub const NO_MUTUAL_OOB: i64 = 3003;
+    /// Completion MAC verification failed -- also a wrong-PIN signature.
+    pub const HMAC_VERIFICATION_FAILED: i64 = 4001;
+}
+
+/// Whether an error code is the signature of a wrong PIN (a different OOB Noob
+/// yields a NoobId the peer cannot recognize, or -- if it collided -- a MAC that
+/// will not verify).
+pub fn is_wrong_pin_code(code: i64) -> bool {
+    code == error_code::UNRECOGNIZED_OOB_MSG_ID || code == error_code::HMAC_VERIFICATION_FAILED
+}
+
 /// EAP-NOOB association state (RFC 9140, Figure 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
@@ -30,6 +53,10 @@ pub struct Outcome {
     pub done: bool,
     pub success: bool,
     pub error: Option<String>,
+    /// EAP-NOOB error code (RFC 9140 §3.6.4) when this outcome is a protocol
+    /// failure -- set both when this side fails and when it receives the peer's
+    /// error notification. See [`error_code`] and [`is_wrong_pin_code`].
+    pub error_code: Option<i64>,
 }
 
 /// A completed association: the shared key Kz plus identifying metadata.
@@ -103,6 +130,8 @@ struct Wire {
     macp: Option<Box<RawValue>>,
     #[serde(rename = "ErrorCode", default, skip_serializing_if = "Option::is_none")]
     error_code: Option<i64>,
+    #[serde(rename = "ErrorInfo", default, skip_serializing_if = "Option::is_none")]
+    error_info: Option<String>,
     #[serde(rename = "eap", default, skip_serializing_if = "Option::is_none")]
     eap: Option<String>,
 }
@@ -169,9 +198,13 @@ impl Method {
 }
 
 fn err_bytes(code: i64, info: &str) -> Vec<u8> {
+    // RFC 9140 §3.6.4 error notification: Type=0, ErrorCode, ErrorInfo. `eap` is
+    // reserved for the terminating success/failure result and must stay unset so
+    // a real peer surfaces this as a ProtocolError carrying the code.
     serde_json::to_vec(&Wire {
+        type_: Some(0),
         error_code: Some(code),
-        eap: Some(info.to_string()),
+        error_info: Some(info.to_string()),
         ..Default::default()
     })
     .unwrap_or_default()
@@ -195,6 +228,7 @@ pub struct Server {
     peer_state: i64,
     csp: i64,
     dirp: i64,
+    server_info: String,
     assoc: Option<Association>,
 }
 
@@ -209,6 +243,7 @@ impl Default for Server {
             peer_state: 0,
             csp: 0,
             dirp: 0,
+            server_info: "{}".to_string(),
             assoc: None,
         }
     }
@@ -218,11 +253,22 @@ impl Server {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Carry a JSON ServerInfo object (e.g. this node's PairingInfo) that the
+    /// peer authenticates via the Completion MAC. Dirs default to server-to-peer.
+    pub fn with_server_info(mut self, info_json: String) -> Self {
+        self.server_info = info_json;
+        self.dirs = 2;
+        self
+    }
     pub fn state(&self) -> State {
         self.state
     }
     pub fn association(&self) -> Option<&Association> {
         self.assoc.as_ref()
+    }
+    /// The peer's authenticated PeerInfo (verbatim JSON), valid once Registered.
+    pub fn peer_info(&self) -> &str {
+        &self.m.inp.peer_info
     }
 
     /// Start a new EAP conversation: Type 1 Discovery request.
@@ -242,7 +288,8 @@ impl Server {
         if let Some(code) = wm.error_code {
             return Outcome {
                 done: true,
-                error: Some(format!("peer error {code}")),
+                error: Some(peer_error_msg(code, &wm.error_info)),
+                error_code: Some(code),
                 ..Default::default()
             };
         }
@@ -283,7 +330,7 @@ impl Server {
         let vers = serde_json::to_string(&self.versions).unwrap();
         let cs = serde_json::to_string(&self.cryptosuites).unwrap();
         let dirs = self.dirs.to_string();
-        let server_info = "{}".to_string();
+        let server_info = self.server_info.clone();
         self.m.inp.vers = vers.clone();
         self.m.inp.peer_id = jstr(&peer_id);
         self.m.inp.cryptosuites = cs.clone();
@@ -412,7 +459,7 @@ impl Server {
             .and_then(|s| unb64(&s))
             .unwrap_or_default();
         if got != self.m.noob_id {
-            return self.fail("unrecognized NoobId");
+            return self.fail_code(error_code::UNRECOGNIZED_OOB_MSG_ID, "unrecognized NoobId");
         }
         self.build_completion()
     }
@@ -441,7 +488,7 @@ impl Server {
         let kmp = self.m.keym.as_ref().unwrap().kmp;
         let expected = compute_mac(&kmp, 1, &self.m.inp);
         if !mac_equal(&macp, &expected) {
-            return self.fail("MACp verification failed");
+            return self.fail_code(error_code::HMAC_VERIFICATION_FAILED, "MACp verification failed");
         }
         self.assoc = Some(self.finish());
         self.state = State::Registered;
@@ -499,10 +546,14 @@ impl Server {
         }
     }
     fn fail(&self, info: &str) -> Outcome {
+        self.fail_code(error_code::INVALID_DATA, info)
+    }
+    fn fail_code(&self, code: i64, info: &str) -> Outcome {
         Outcome {
-            send: Some(err_bytes(1, info)),
+            send: Some(err_bytes(code, info)),
             done: true,
             error: Some(info.to_string()),
+            error_code: Some(code),
             ..Default::default()
         }
     }
@@ -518,6 +569,7 @@ pub struct Peer {
     m: Method,
     csp: i64,
     dirp: i64,
+    peer_info: String,
     assoc: Option<Association>,
 }
 
@@ -534,6 +586,7 @@ impl Default for Peer {
             },
             csp: 0,
             dirp: 0,
+            peer_info: "{}".to_string(),
             assoc: None,
         }
     }
@@ -543,11 +596,21 @@ impl Peer {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Carry a JSON PeerInfo object (e.g. this node's PairingInfo) that the
+    /// server authenticates via the Completion MAC.
+    pub fn with_peer_info(mut self, info_json: String) -> Self {
+        self.peer_info = info_json;
+        self
+    }
     pub fn state(&self) -> State {
         self.state
     }
     pub fn association(&self) -> Option<&Association> {
         self.assoc.as_ref()
+    }
+    /// The server's authenticated ServerInfo (verbatim JSON), valid once Registered.
+    pub fn server_info(&self) -> &str {
+        &self.m.inp.server_info
     }
 
     pub fn receive(&mut self, input: &[u8]) -> Outcome {
@@ -561,7 +624,8 @@ impl Peer {
         if let Some(code) = wm.error_code {
             return Outcome {
                 done: true,
-                error: Some(format!("server error {code}")),
+                error: Some(peer_error_msg(code, &wm.error_info)),
+                error_code: Some(code),
                 ..Default::default()
             };
         }
@@ -638,7 +702,7 @@ impl Peer {
         if let Some(new_nai) = parse_str(&wm.new_nai) {
             self.m.nai = new_nai;
         }
-        let peer_info = "{}".to_string();
+        let peer_info = self.peer_info.clone();
         self.m.inp.vers = get(&wm.vers);
         self.m.inp.peer_id = get(&wm.peer_id);
         self.m.inp.cryptosuites = get(&wm.cryptosuites);
@@ -728,7 +792,7 @@ impl Peer {
             .and_then(|s| unb64(&s))
             .unwrap_or_default();
         if got != self.m.noob_id {
-            return self.fail("unrecognized NoobId");
+            return self.fail_code(error_code::UNRECOGNIZED_OOB_MSG_ID, "unrecognized NoobId");
         }
         let macs = parse_str(&wm.macs)
             .and_then(|s| unb64(&s))
@@ -736,7 +800,7 @@ impl Peer {
         self.m.derive();
         let kms = self.m.keym.as_ref().unwrap().kms;
         if !mac_equal(&macs, &compute_mac(&kms, 2, &self.m.inp)) {
-            return self.fail("MACs verification failed");
+            return self.fail_code(error_code::HMAC_VERIFICATION_FAILED, "MACs verification failed");
         }
         let kmp = self.m.keym.as_ref().unwrap().kmp;
         let macp = compute_mac(&kmp, 1, &self.m.inp);
@@ -769,16 +833,29 @@ impl Peer {
         }
     }
     fn fail(&self, info: &str) -> Outcome {
+        self.fail_code(error_code::INVALID_DATA, info)
+    }
+    fn fail_code(&self, code: i64, info: &str) -> Outcome {
         Outcome {
-            send: Some(err_bytes(1, info)),
+            send: Some(err_bytes(code, info)),
             done: true,
             error: Some(info.to_string()),
+            error_code: Some(code),
             ..Default::default()
         }
     }
 }
 
 // --- helpers ---------------------------------------------------------------
+
+/// Render a received peer error notification into a message, preferring the
+/// peer's ErrorInfo when present.
+fn peer_error_msg(code: i64, info: &Option<String>) -> String {
+    match info {
+        Some(s) if !s.is_empty() => format!("peer error {code}: {s}"),
+        _ => format!("peer error {code}"),
+    }
+}
 
 fn new_peer_id() -> String {
     b64(&rand16())

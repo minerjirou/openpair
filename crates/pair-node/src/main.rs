@@ -18,14 +18,19 @@
 //!   OPENPAIR_UI_BIND      dashboard UI bind       (default: 127.0.0.1:7070)
 
 mod nodeinfo_server;
+mod pairing;
 mod trust;
 
+use pair_cluster::TrustSink;
 use pair_discovery::Discovery;
 use pair_proto::NodeRecord;
 use pair_trust::{Identity, PeerPinStore};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use tracing::{info, warn};
+
+/// Default plain-HTTP pairing-channel bind (`/v1/cluster/pairing`, §7.2).
+const DEFAULT_PAIRING_BIND: &str = "0.0.0.0:14321";
 
 fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
@@ -56,6 +61,21 @@ async fn main() -> anyhow::Result<()> {
     if std::env::args().any(|a| a == "--gpucheck") {
         gpu_check();
         return Ok(());
+    }
+    // Operator-driven cluster pairing subcommands (§7.2):
+    //   openpair-node invite <joiner-host[:port]>   grow this node's cluster
+    //   openpair-node join                          wait to be invited, enter PIN
+    let args: Vec<String> = std::env::args().collect();
+    match args.get(1).map(String::as_str) {
+        Some("invite") => {
+            init_tracing();
+            return run_invite(args.get(2).cloned()).await;
+        }
+        Some("join") => {
+            init_tracing();
+            return run_join().await;
+        }
+        _ => {}
     }
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -137,6 +157,42 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     info!(%ingress_bind, "serving mutual-TLS /ingress for peers");
+
+    // 4b. Cluster pairing channel (plain-HTTP /v1/cluster/pairing, §7.2).
+    //     Serving it lets a cluster inviter reach this node; the operator drives
+    //     the PIN step via `openpair-node join`. Pairing establishes mutual-TLS
+    //     trust by pinning the peer's authenticated certificate.
+    {
+        let pairing_bind: std::net::SocketAddr =
+            env_or("OPENPAIR_PAIRING_BIND", DEFAULT_PAIRING_BIND).parse()?;
+        let cluster_dir = std::env::var("OPENPAIR_CLUSTER_DIR").ok().map(PathBuf::from);
+        let sink = pairing::ClusterTrustSink::new(
+            pins.clone(),
+            cluster_dir,
+            !pins.read().unwrap().is_empty(),
+        );
+        let advertised = format!(
+            "{}:{}",
+            local_ip().unwrap_or_else(|| "127.0.0.1".into()),
+            pairing_bind.port()
+        );
+        let profile = pairing::node_profile(
+            Arc::new(identity.clone()),
+            hostname(),
+            advertised.clone(),
+            String::new(),
+            String::new(),
+        );
+        let node = pairing::build_node(profile, sink);
+        tokio::spawn(async move {
+            if let Err(e) =
+                pair_cluster::serve_pairing(pairing_bind, node, std::future::pending()).await
+            {
+                warn!(error = %e, "pairing channel exited");
+            }
+        });
+        info!(%pairing_bind, advertised = %advertised, "serving /v1/cluster/pairing (EAP-NOOB)");
+    }
 
     // 5. Routing table + model pollers + cluster-aware loopback proxy.
     let routing = Arc::new(RwLock::new(pair_proxy::RoutingTable::new(node_id.clone())));
@@ -270,6 +326,151 @@ async fn main() -> anyhow::Result<()> {
     info!("shutting down");
     let _ = discovery.daemon().shutdown();
     Ok(())
+}
+
+fn init_tracing() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
+        .try_init();
+}
+
+/// Load this node's identity + live pin store, preferring a reference-compatible
+/// cluster directory. Returns the optional cluster dir for trust persistence.
+fn load_identity_pins() -> anyhow::Result<(Identity, pair_trust::SharedPins, Option<PathBuf>)> {
+    if let Ok(cdir) = std::env::var("OPENPAIR_CLUSTER_DIR") {
+        let dir = PathBuf::from(&cdir);
+        let (id, store) = pair_trust::load_cluster_dir(&dir)?;
+        Ok((id, Arc::new(RwLock::new(store)), Some(dir)))
+    } else {
+        let data_dir = PathBuf::from(env_or("OPENPAIR_DATA_DIR", "./openpair-data"));
+        let id = Identity::load_or_generate(&data_dir)?;
+        Ok((id, Arc::new(RwLock::new(PeerPinStore::new())), None))
+    }
+}
+
+/// Build a [`pair_cluster::PairingNode`] + its serving future for an
+/// operator-driven pairing flow, returning the node, the trust sink, and the
+/// bound pairing address.
+async fn pairing_endpoint() -> anyhow::Result<(
+    Arc<pair_cluster::PairingNode>,
+    Arc<pairing::ClusterTrustSink>,
+    std::net::SocketAddr,
+)> {
+    let (identity, pins, cluster_dir) = load_identity_pins()?;
+    let pairing_bind: std::net::SocketAddr =
+        env_or("OPENPAIR_PAIRING_BIND", DEFAULT_PAIRING_BIND).parse()?;
+    let already = !pins.read().unwrap().is_empty();
+    let sink = pairing::ClusterTrustSink::new(pins, cluster_dir, already);
+    let advertised = format!(
+        "{}:{}",
+        local_ip().unwrap_or_else(|| "127.0.0.1".into()),
+        pairing_bind.port()
+    );
+    let profile = pairing::node_profile(
+        Arc::new(identity),
+        hostname(),
+        advertised,
+        String::new(),
+        String::new(),
+    );
+    let node = pairing::build_node(profile, sink.clone());
+    let srv = node.clone();
+    tokio::spawn(async move {
+        if let Err(e) = pair_cluster::serve_pairing(pairing_bind, srv, std::future::pending()).await
+        {
+            warn!(error = %e, "pairing channel exited");
+        }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+    Ok((node, sink, pairing_bind))
+}
+
+/// Inviter: drive an Initial Exchange to `joiner`, print the PIN, and wait for
+/// the joiner to complete the join (§7.2).
+async fn run_invite(joiner: Option<String>) -> anyhow::Result<()> {
+    let joiner = joiner.ok_or_else(|| {
+        anyhow::anyhow!("usage: openpair-node invite <joiner-host[:port]>")
+    })?;
+    let joiner_addr = normalize_pairing_addr(&joiner);
+    let (node, sink, _bind) = pairing_endpoint().await?;
+
+    info!(joiner = %joiner_addr, "inviting node to this cluster");
+    let (invite_id, pin) = node.create_invite(&joiner_addr).await?;
+    println!("\n=== Cluster invite created ===");
+    println!("  invite id : {invite_id}");
+    println!("  PIN       : {pin}");
+    println!("Enter this PIN on the joining node (`openpair-node join`).\n");
+
+    // Wait for the joiner-driven Completion Exchange to establish trust.
+    for _ in 0..600 {
+        if sink.is_clustered() {
+            println!("Peer joined and its certificate is pinned. Pairing complete.");
+            return Ok(());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    anyhow::bail!("timed out waiting for the joiner to enter the PIN")
+}
+
+/// Joiner: wait to be invited, then enter the PIN shown by the inviter (§7.2).
+async fn run_join() -> anyhow::Result<()> {
+    let (node, sink, bind) = pairing_endpoint().await?;
+    let advertised = format!(
+        "{}:{}",
+        local_ip().unwrap_or_else(|| "127.0.0.1".into()),
+        bind.port()
+    );
+    println!("\nWaiting to be invited at {advertised}.");
+    println!("Ask the cluster owner to run: openpair-node invite {advertised}\n");
+
+    // Wait for an inbound invite (the inviter drives the Initial Exchange to us).
+    let invite = loop {
+        if sink.is_clustered() {
+            println!("Already clustered; nothing to do.");
+            return Ok(());
+        }
+        let pending = node.pending_invites().await;
+        if let Some(inv) = pending.into_iter().next() {
+            break inv;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    };
+    println!(
+        "Invited to cluster \"{}\" by {} ({}).",
+        invite.cluster_friendly_name, invite.from_name, invite.from_node_uuid
+    );
+
+    let pin = prompt_pin().await?;
+    let paired = node.submit_pin(&invite.invite_id, &pin).await?;
+    println!(
+        "\nJoined cluster \"{}\" via {}. Inviter certificate pinned.",
+        paired.peer.cluster_friendly_name, paired.peer.name
+    );
+    Ok(())
+}
+
+/// Normalize a bare `host` to `host:14321`, leaving an explicit port intact.
+fn normalize_pairing_addr(input: &str) -> String {
+    if input.rsplit_once(':').map(|(_, p)| p.parse::<u16>().is_ok()) == Some(true) {
+        input.to_string()
+    } else {
+        format!("{input}:{}", pair_cluster::DEFAULT_PAIRING_PORT)
+    }
+}
+
+/// Read a six-digit PIN from stdin (blocking read off the async runtime).
+async fn prompt_pin() -> anyhow::Result<String> {
+    print!("Enter the 6-digit PIN shown by the inviter: ");
+    use std::io::Write;
+    std::io::stdout().flush().ok();
+    let pin = tokio::task::spawn_blocking(|| {
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).map(|_| line)
+    })
+    .await??;
+    Ok(pin.trim().to_string())
 }
 
 /// Best-effort primary (outbound) IPv4 of this host, for the mDNS `ip` TXT.

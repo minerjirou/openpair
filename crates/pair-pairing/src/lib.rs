@@ -22,10 +22,12 @@ pub mod kdf;
 pub mod mac;
 pub mod machine;
 pub mod messages;
+pub mod pin;
 pub mod suite;
 
 pub use kdf::{one_step_kdf_sha256, DerivedKeys, EAPNOOB_OUTPUT_LEN};
 pub use machine::{Association, Outcome, Peer, Server, State};
+pub use pin::{is_valid_pin, noob_from_pin};
 pub use messages::{MsgType, WireMessage};
 pub use suite::{Jwk, KeyPair, Suite};
 

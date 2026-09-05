@@ -7,6 +7,7 @@ members = [
     "crates/pair-discovery",
     "crates/pair-trust",
     "crates/pair-pairing",
+    "crates/pair-cluster",
     "crates/pair-proxy",
     "crates/pair-ui",
     "crates/pair-node",
