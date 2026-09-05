@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openpair node</title>
+<style>
+  :root { color-scheme: dark light; --bg:#0e1116; --card:#171b22; --line:#2a2f3a; --fg:#e6e9ef; --mut:#9aa4b2; --acc:#4f8cff; --ok:#3fb950; --warn:#d29922; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; letter-spacing:.3px; }
+  header .fp { color:var(--mut); font-family:ui-monospace,monospace; font-size:12px; }
+  header .dot { width:8px; height:8px; border-radius:50%; background:var(--ok); display:inline-block; }
+  main { max-width:1000px; margin:0 auto; padding:20px; display:grid; gap:16px; grid-template-columns:1fr 1fr; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .card.wide { grid-column:1 / -1; }
+  .card h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); }
+  table { width:100%; border-collapse:collapse; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
+  th { color:var(--mut); font-weight:600; }
+  code, .mono { font-family:ui-monospace,monospace; font-size:12px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px; border:1px solid var(--line); }
+  .pill.ok { color:var(--ok); border-color:#1f6f34; }
+  .pill.no { color:var(--warn); border-color:#6b5115; }
+  .muted { color:var(--mut); }
+  input, textarea, button { font:inherit; color:var(--fg); background:#0b0e13; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  textarea { width:100%; height:88px; font-family:ui-monospace,monospace; font-size:11px; }
+  button { background:var(--acc); border-color:var(--acc); color:#fff; cursor:pointer; }
+  button.sec { background:transparent; color:var(--fg); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .bar { height:8px; background:#0b0e13; border-radius:4px; overflow:hidden; border:1px solid var(--line); }
+  .bar > i { display:block; height:100%; background:var(--acc); }
+  #msg { min-height:18px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <h1>openpair</h1>
+  <span id="uuid" class="mono"></span>
+  <span id="fp" class="fp"></span>
+</header>
+<main>
+  <section class="card">
+    <h2>Hardware</h2>
+    <div id="hw">…</div>
+  </section>
+  <section class="card">
+    <h2>Trusted peers (pinned)</h2>
+    <table><thead><tr><th>node</th><th>fingerprint</th></tr></thead><tbody id="trusted"></tbody></table>
+  </section>
+  <section class="card wide">
+    <h2>Routing</h2>
+    <div class="row muted">Local models: <span id="localmodels" class="mono"></span></div>
+    <table><thead><tr><th>peer</th><th>host</th><th>ingress</th><th>pinned</th><th>models</th></tr></thead><tbody id="peers"></tbody></table>
+  </section>
+  <section class="card wide">
+    <h2>Pairing</h2>
+    <p class="muted">Pair two openpair nodes by exchanging certificates (mutual TLS trust). Open each node's dashboard and pair to the other.</p>
+    <div class="row">
+      <input id="peerurl" placeholder="http://PEER_HOST:7070" style="flex:1; min-width:240px">
+      <button onclick="pair()">Pair with peer</button>
+    </div>
+    <div class="row"><div id="msg"></div></div>
+    <details style="margin-top:10px">
+      <summary class="muted">Manual: this node's certificate / add a peer certificate</summary>
+      <div class="row" style="margin-top:8px">
+        <button class="sec" onclick="showCert()">Show my certificate</button>
+      </div>
+      <textarea id="mycert" readonly placeholder="(click ‘Show my certificate’)"></textarea>
+      <div class="row"><textarea id="addcert" placeholder="Paste a peer certificate PEM here"></textarea></div>
+      <div class="row"><button class="sec" onclick="addCert()">Add trusted certificate</button></div>
+    </details>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const gb = n => n==null ? "—" : (n/1073741824).toFixed(2)+" GB";
+function esc(s){ return String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function refresh(){
+  try {
+    const s = await (await fetch('/api/status')).json();
+    $('#uuid').textContent = s.node_uuid || '';
+    $('#fp').textContent = s.fingerprint || '';
+    // hardware
+    let h = '';
+    if (s.cpu) h += `<div><b>CPU</b> ${esc(s.cpu.name||'')} <span class="muted">(${s.cpu.cores||'?'} cores)</span></div>`;
+    if (s.memory) { const u=s.memory.used_bytes, t=s.memory.total_bytes, p=t?Math.round(100*u/t):0;
+      h += `<div style="margin:6px 0"><b>Memory</b> ${gb(u)} / ${gb(t)}<div class="bar"><i style="width:${p}%"></i></div></div>`; }
+    (s.gpus||[]).forEach(g=>{ const p=(g.vram_bytes&&g.vram_used_bytes)?Math.round(100*g.vram_used_bytes/g.vram_bytes):null;
+      h += `<div style="margin:6px 0"><b>GPU</b> ${esc(g.name)} <span class="muted">${gb(g.vram_bytes)}${g.utilization_percent!=null?' · '+g.utilization_percent+'%':''}</span>`
+         + (p!=null?`<div class="bar"><i style="width:${p}%"></i></div>`:'') + `</div>`; });
+    $('#hw').innerHTML = h || '<span class="muted">no data</span>';
+    // trusted
+    $('#trusted').innerHTML = (s.trusted||[]).map(t=>`<tr><td class="mono">${esc(t.node_uuid)}</td><td class="mono">${esc((t.fingerprint||'').slice(0,23))}…</td></tr>`).join('') || '<tr><td colspan=2 class="muted">none</td></tr>';
+    // routing
+    $('#localmodels').textContent = (s.local_models||[]).join(', ') || '(none)';
+    $('#peers').innerHTML = (s.peers||[]).map(p=>`<tr><td class="mono">${esc(p.node_id.slice(0,13))}…</td><td>${esc(p.host)}</td><td>${p.ingress_port}</td>`
+      +`<td><span class="pill ${p.pinned?'ok':'no'}">${p.pinned?'pinned':'no'}</span></td><td class="muted">${esc((p.models||[]).join(', '))||'—'}</td></tr>`).join('') || '<tr><td colspan=5 class="muted">no peers discovered</td></tr>';
+  } catch(e){ /* node may be starting */ }
+}
+async function pair(){
+  const peer = $('#peerurl').value.trim(); if(!peer) return;
+  $('#msg').textContent = 'Pairing…';
+  try { const r = await (await fetch('/api/trust/pair',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({peer})})).json();
+    $('#msg').innerHTML = r.ok ? `<span class="pill ok">paired</span> with ${esc(r.node_uuid||'')}` : `<span class="pill no">failed</span> ${esc(r.error||'')}`; refresh();
+  } catch(e){ $('#msg').innerHTML = `<span class="pill no">error</span> ${esc(e)}`; }
+}
+async function showCert(){ $('#mycert').value = await (await fetch('/api/identity/cert')).text(); }
+async function addCert(){
+  const pem = $('#addcert').value.trim(); if(!pem) return;
+  const r = await (await fetch('/api/trust/add',{method:'POST',body:pem})).json();
+  $('#msg').innerHTML = r.ok ? `<span class="pill ok">added</span> ${esc(r.node_uuid||'')}` : `<span class="pill no">failed</span> ${esc(r.error||'')}`; refresh();
+}
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # openpair
 
-**A clean-room, Rust implementation of a node that interoperates with the
+**An independent Rust implementation of a node that interoperates with the
 *Personal AI Router* (PAIR) LAN AI-inference clustering protocol — with
 first-class AMD / ROCm GPU support.**
 
@@ -9,12 +9,11 @@ first-class AMD / ROCm GPU support.**
 
 *日本語: [README.ja.md](README.ja.md)*
 
-> **Independent reimplementation.** openpair contains **no third-party source
-> code**. Only the *interoperability contract* of the protocol (network service
-> identifiers, message field names, wire framing, and the cryptographic
-> parameters required to interoperate) is reproduced, as is necessary and
-> customary for interoperable software. See [`NOTICE`](./NOTICE) and
-> [Legal](#legal).
+> **Independent implementation.** openpair is an independent Rust implementation
+> compatible with the **[NVIDIA Personal AI Router](https://github.com/NVIDIA/Personal-AI-Router)**
+> (Apache-2.0). It reproduces the PAIR protocol's interoperability contract to
+> interoperate with PAIR clusters and is informed by the upstream source. Both
+> projects are Apache-2.0. See [`NOTICE`](./NOTICE) and [Legal](#legal).
 
 ---
 
@@ -60,6 +59,7 @@ openpair does two things:
 | [`pair-trust`](crates/pair-trust) | Ed25519 identity, cert pinning, mutual-TLS, cluster dir |
 | [`pair-pairing`](crates/pair-pairing) | EAP-NOOB (RFC 9140) cryptosuites, KDF, MACs, messages |
 | [`pair-proxy`](crates/pair-proxy) | reverse proxy, model-based routing, mTLS `/ingress` |
+| [`pair-ui`](crates/pair-ui) | node web dashboard + control API (pairing, status) |
 | [`pair-node`](crates/pair-node) | the `openpair-node` daemon |
 
 ## Quick start
@@ -75,6 +75,9 @@ cargo run -p pair-node --bin openpair-node -- --gpucheck
 # Run a node (talks to a local Ollama at 127.0.0.1:11434 by default)
 cargo run -p pair-node --bin openpair-node
 curl -s http://127.0.0.1:7071/v1/node-info | jq
+
+# then open the dashboard
+#   http://127.0.0.1:7070
 ```
 
 ### Configuration (environment)
@@ -85,7 +88,8 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 | `OPENPAIR_PROXY_BIND` | `127.0.0.1:11435` | loopback Ollama/OpenAI proxy |
 | `OPENPAIR_NODEINFO_BIND` | `127.0.0.1:7071` | `GET /v1/node-info` |
 | `OPENPAIR_INGRESS_BIND` | `0.0.0.0:7443` | mutual-TLS `/ingress` for peers |
-| `OPENPAIR_ADVERTISE_PORT` | `7443` | mDNS advertised port |
+| `OPENPAIR_UI_BIND` | `127.0.0.1:7070` | web dashboard + control API |
+| `OPENPAIR_ADVERTISE_PORT` | node-info port | mDNS advertised port |
 | `OPENPAIR_CLUSTER_DIR` | — | reference-compatible trust dir (`node.crt`/`node.key`/`trusted/`) |
 | `OPENPAIR_DATA_DIR` | `./openpair-data` | standalone identity store (when no cluster dir) |
 
@@ -115,10 +119,13 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports: [`SECURITY.md`](SECU
 
 ## Legal
 
-openpair is an **independent, interoperable reimplementation** written from
-scratch. It ships **no** third-party source code, binaries, decompiler output,
-or copyrighted assets. Reproducing a protocol's interface for interoperability
-is the project's sole purpose.
+openpair is an **independent Rust implementation** compatible with the
+**[NVIDIA Personal AI Router](https://github.com/NVIDIA/Personal-AI-Router)**,
+which is licensed under the Apache License 2.0. openpair reproduces the PAIR
+protocol's interoperability contract and is informed by the upstream source;
+both projects are Apache-2.0. When using or redistributing material derived from
+the upstream project, comply with its Apache-2.0 license and retain its
+attributions and NOTICE.
 
 "NVIDIA", "PAIR", and "Personal AI Router" are trademarks of their respective
 owners. **This project is not affiliated with, endorsed, or sponsored by

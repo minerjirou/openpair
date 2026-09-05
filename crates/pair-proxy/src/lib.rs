@@ -29,7 +29,7 @@ pub use ingress::IngressEnvelope;
 pub use live::{serve_routing, ProxyContext};
 pub use model::{extract_model, normalize_model_key};
 pub use router::{select, Candidate};
-pub use routing::{PeerEntry, RoutingTable};
+pub use routing::{PeerEntry, PeerView, RoutingSnapshot, RoutingTable};
 
 /// Where a local application connects and which protocols are accepted.
 #[derive(Debug, Clone)]

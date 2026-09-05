@@ -2,19 +2,20 @@
 
 *日本語: [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md)*
 
-Thanks for your interest! openpair is a clean-room, interoperable implementation
-and we intend to keep it that way.
+Thanks for your interest! openpair is an independent Rust implementation
+compatible with the Apache-2.0 [NVIDIA Personal AI Router](https://github.com/NVIDIA/Personal-AI-Router).
 
 ## Ground rules (important)
 
-- **Clean-room only.** Do **not** paste, adapt, or upload third-party source
-  code, decompiler/disassembler output, proprietary binaries, or copyrighted
-  assets. Contributions must be your own original work.
-- Contribute against the **documented interoperability contract**
-  ([`docs/PROTOCOL.md`](docs/PROTOCOL.md)) — field names, framing, and crypto
-  parameters needed to interoperate — not by copying an implementation.
-- If you confirm a `[live]` protocol detail via your own dynamic testing on your
-  own machines, cite *what you observed* (values/shape), not any code.
+- **Respect licenses.** The upstream project is Apache-2.0. You may reference it,
+  but do **not** copy upstream source (or any third-party code) verbatim without
+  complying with its license — retain copyright/NOTICE and attribute derived
+  work. Prefer implementing against the documented interoperability contract
+  ([`docs/PROTOCOL.md`](docs/PROTOCOL.md)).
+- Keep contributions your own original work, or properly attributed and
+  license-compatible (Apache-2.0).
+- When you pin down a protocol detail from the upstream source or your own
+  testing, note the source/observation in the code comment or PR.
 
 ## Development
 

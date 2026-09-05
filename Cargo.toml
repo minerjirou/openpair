@@ -8,6 +8,7 @@ members = [
     "crates/pair-trust",
     "crates/pair-pairing",
     "crates/pair-proxy",
+    "crates/pair-ui",
     "crates/pair-node",
 ]
 

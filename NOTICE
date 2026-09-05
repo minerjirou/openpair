@@ -1,14 +1,26 @@
 openpair
 Copyright 2026 The openpair authors
 
-This is an independent, clean-room implementation of a node that interoperates
-with the "Personal AI Router" (PAIR) LAN inference-clustering protocol.
+This project is an independent implementation, in Rust, of a node compatible with
+the "Personal AI Router" (PAIR) LAN AI-inference clustering protocol.
 
-It contains NO third-party source code. Only the interoperability contract of
-the protocol (network service identifiers, message field names, wire framing and
-cryptographic parameters required to inter[-]operate) has been reproduced, as is
-necessary and customary for interoperable software. No proprietary binaries,
-decompiler output, or copyrighted assets are included in this repository.
+Upstream project
+----------------
+NVIDIA Personal AI Router — https://github.com/NVIDIA/Personal-AI-Router
+Licensed under the Apache License, Version 2.0.
 
-"NVIDIA", "PAIR" and "Personal AI Router" are trademarks of their respective
+openpair reproduces the PAIR protocol's interoperability contract (network
+service identifiers, message field names, wire framing, and the cryptographic
+parameters required to interoperate) so that it can interoperate with PAIR
+clusters. Portions of that contract, and protocol details, are derived from and
+informed by the upstream project. openpair is itself licensed under the Apache
+License, Version 2.0 (see LICENSE); when using or redistributing material derived
+from the upstream project, comply with the upstream Apache-2.0 license and retain
+the upstream attributions and NOTICE. See the upstream repository for the
+original work and its NOTICE / Third-Party Software Notices.
+
+Trademarks
+----------
+"NVIDIA", "PAIR", and "Personal AI Router" are trademarks of their respective
 owners. This project is not affiliated with, endorsed by, or sponsored by NVIDIA.
+Names are used nominatively only, to describe compatibility.

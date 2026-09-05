@@ -1,17 +1,16 @@
 # openpair
 
 **PAIR（Personal AI Router）の LAN AI 推論クラスタ・プロトコルと相互接続する、
-Rust によるクリーンルーム実装ノード。AMD / ROCm GPU を第一級でサポートします。**
+Rust による独立実装ノード。AMD / ROCm GPU を第一級でサポートします。**
 
 [![CI](https://github.com/minerjirou/openpair/actions/workflows/ci.yml/badge.svg)](https://github.com/minerjirou/openpair/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 
 *English: [README.md](README.md)*
 
-> **独立した再実装です。** openpair は**第三者のソースコードを一切含みません**。
-> 相互運用に必要なプロトコルの*インターフェース契約*（ネットワークサービス識別子・
-> メッセージのフィールド名・ワイヤフレーミング・相互運用に必要な暗号パラメータ）のみを
-> 再現しています。これは相互運用可能なソフトウェアとして必要かつ慣行的な範囲です。
+> **独立実装です。** openpair は **[NVIDIA Personal AI Router](https://github.com/NVIDIA/Personal-AI-Router)**
+> （Apache-2.0）と互換な独立 Rust 実装です。PAIR プロトコルの相互運用契約を再現して
+> PAIR クラスタと相互接続し、上流ソースを参照しています。両プロジェクトとも Apache-2.0 です。
 > [`NOTICE`](./NOTICE) と [法的事項](#法的事項) を参照してください。
 
 ---
@@ -55,6 +54,7 @@ openpair は次の 2 つを実現します：
 | [`pair-trust`](crates/pair-trust) | Ed25519 アイデンティティ、証明書 pin、mutual TLS、クラスタ dir |
 | [`pair-pairing`](crates/pair-pairing) | EAP-NOOB（RFC 9140）スイート、KDF、MAC、メッセージ |
 | [`pair-proxy`](crates/pair-proxy) | リバースプロキシ、モデルベースのルーティング、mTLS `/ingress` |
+| [`pair-ui`](crates/pair-ui) | ノード Web ダッシュボード＋制御API（ペアリング・状態） |
 | [`pair-node`](crates/pair-node) | `openpair-node` デーモン |
 
 ## クイックスタート
@@ -70,6 +70,9 @@ cargo run -p pair-node --bin openpair-node -- --gpucheck
 # ノードを起動（既定でローカル Ollama 127.0.0.1:11434 と通信）
 cargo run -p pair-node --bin openpair-node
 curl -s http://127.0.0.1:7071/v1/node-info | jq
+
+# ダッシュボードを開く
+#   http://127.0.0.1:7070
 ```
 
 ### 設定（環境変数）
@@ -80,7 +83,8 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 | `OPENPAIR_PROXY_BIND` | `127.0.0.1:11435` | loopback の Ollama/OpenAI プロキシ |
 | `OPENPAIR_NODEINFO_BIND` | `127.0.0.1:7071` | `GET /v1/node-info` |
 | `OPENPAIR_INGRESS_BIND` | `0.0.0.0:7443` | peer 向け mutual TLS `/ingress` |
-| `OPENPAIR_ADVERTISE_PORT` | `7443` | mDNS 広告ポート |
+| `OPENPAIR_UI_BIND` | `127.0.0.1:7070` | Web ダッシュボード＋制御API |
+| `OPENPAIR_ADVERTISE_PORT` | node-infoポート | mDNS 広告ポート |
 | `OPENPAIR_CLUSTER_DIR` | — | 参照互換の信頼 dir（`node.crt`/`node.key`/`trusted/`） |
 | `OPENPAIR_DATA_DIR` | `./openpair-data` | 単体運用時のアイデンティティ保存先 |
 
@@ -108,9 +112,10 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 ## 法的事項
 
-openpair は**一から書き起こした、独立した相互運用実装**です。第三者のソースコード、
-バイナリ、逆コンパイル出力、著作物を**一切**含みません。相互運用のためにプロトコルの
-インターフェースを再現することが本プロジェクトの唯一の目的です。
+openpair は **[NVIDIA Personal AI Router](https://github.com/NVIDIA/Personal-AI-Router)**
+（Apache License 2.0）と互換な**独立した Rust 実装**です。PAIR プロトコルの相互運用契約を
+再現し、上流ソースを参照しています。両プロジェクトとも Apache-2.0 です。上流由来の成果物を
+利用・再配布する際は、上流の Apache-2.0 ライセンスに従い、帰属表示と NOTICE を保持してください。
 
 「NVIDIA」「PAIR」「Personal AI Router」は各所有者の商標です。**本プロジェクトは
 NVIDIA と提携・承認・後援の関係にありません。** 名称は互換性を説明するための

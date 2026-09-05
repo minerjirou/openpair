@@ -15,6 +15,7 @@ pair-nodeinfo = { path = "../pair-nodeinfo" }
 pair-discovery = { path = "../pair-discovery" }
 pair-trust = { path = "../pair-trust" }
 pair-proxy = { path = "../pair-proxy" }
+pair-ui = { path = "../pair-ui" }
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

@@ -15,6 +15,7 @@
 //!   OPENPAIR_ADVERTISE_PORT mDNS advertised port  (default: the node-info port)
 //!   OPENPAIR_CLUSTER_DIR  reference-compatible trust dir (node.crt/node.key/trusted/)
 //!   OPENPAIR_INGRESS_BIND mTLS /ingress bind      (default: 0.0.0.0:7443)
+//!   OPENPAIR_UI_BIND      dashboard UI bind       (default: 127.0.0.1:7070)
 
 mod nodeinfo_server;
 mod trust;
@@ -140,6 +141,24 @@ async fn main() -> anyhow::Result<()> {
     // 5. Routing table + model pollers + cluster-aware loopback proxy.
     let routing = Arc::new(RwLock::new(pair_proxy::RoutingTable::new(node_id.clone())));
     let id_arc = Arc::new(identity.clone());
+
+    // UI dashboard + control API (operator console; bind to loopback).
+    {
+        let ui_bind: std::net::SocketAddr = env_or("OPENPAIR_UI_BIND", "127.0.0.1:7070").parse()?;
+        let ui_ctx = Arc::new(pair_ui::UiContext {
+            node_id: node_id.clone(),
+            identity: id_arc.clone(),
+            pins: pins.clone(),
+            routing: routing.clone(),
+            ingress_port: ingress_bind.port(),
+        });
+        tokio::spawn(async move {
+            if let Err(e) = pair_ui::serve(ui_bind, ui_ctx, std::future::pending()).await {
+                warn!(error = %e, "ui server exited");
+            }
+        });
+        info!(%ui_bind, "serving dashboard UI");
+    }
 
     // Poll the local engine's model list.
     {

@@ -104,6 +104,52 @@ impl RoutingTable {
         self.peers.len()
     }
 
+    /// A serializable snapshot for status/UI.
+    pub fn snapshot(&self) -> RoutingSnapshot {
+        let mut local_models: Vec<String> = self.local_models.iter().cloned().collect();
+        local_models.sort();
+        let mut peers: Vec<PeerView> = self
+            .peers
+            .values()
+            .map(|p| {
+                let mut models: Vec<String> = p.models.iter().cloned().collect();
+                models.sort();
+                PeerView {
+                    node_id: p.node_id.clone(),
+                    host: p.host.clone(),
+                    ingress_port: p.ingress_port,
+                    pinned: p.pinned,
+                    priority_rank: p.priority_rank,
+                    models,
+                }
+            })
+            .collect();
+        peers.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+        RoutingSnapshot {
+            local_models,
+            peers,
+        }
+    }
+}
+
+/// Serializable view of the routing table.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RoutingSnapshot {
+    pub local_models: Vec<String>,
+    pub peers: Vec<PeerView>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PeerView {
+    pub node_id: String,
+    pub host: String,
+    pub ingress_port: u16,
+    pub pinned: bool,
+    pub priority_rank: Option<u32>,
+    pub models: Vec<String>,
+}
+
+impl RoutingTable {
     /// Build the candidate set for a request. `model = None` means "no model in
     /// the body" — only the local node is a candidate (we don't blind-route).
     pub fn candidates_for(&self, model: Option<&str>, backend: &str) -> Vec<Candidate> {

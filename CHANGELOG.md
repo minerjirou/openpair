@@ -7,6 +7,10 @@ yet made a tagged release.
 ## [Unreleased]
 
 ### Added
+- **Web dashboard + control API** (`pair-ui`, `openpair-node` on `OPENPAIR_UI_BIND`,
+  default 127.0.0.1:7070): node status, hardware/GPU telemetry, discovered peers
+  and routing, and one-click **pairing** between two openpair nodes by exchanging
+  certificates (establishing mutual-TLS trust).
 - Clean-room Rust workspace implementing a PAIR-interoperable node:
   `pair-proto`, `pair-rpc`, `pair-nodeinfo`, `pair-discovery`, `pair-trust`,
   `pair-pairing`, `pair-proxy`, and the `openpair-node` daemon (`pair-node`).
@@ -25,6 +29,13 @@ yet made a tagged release.
   `docs/DYNAMIC_ANALYSIS_PLAN.md`, `ROADMAP.md`.
 - Japanese documentation (`*.ja.md`): README, CONTRIBUTING, SECURITY, ROADMAP,
   and the `docs/` guides, cross-linked with the English versions.
+
+### Changed
+- Relicensing/attribution: the upstream **NVIDIA Personal AI Router** is
+  Apache-2.0 open source (https://github.com/NVIDIA/Personal-AI-Router). Docs
+  updated from a "clean-room / reverse-engineered" framing to an independent,
+  Apache-2.0-compatible implementation that references and attributes the
+  upstream. NOTICE updated accordingly.
 
 ### Known limitations
 - Some byte-exact EAP-NOOB serializations are marked `TODO(interop)` pending a
