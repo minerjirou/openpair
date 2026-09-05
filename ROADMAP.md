@@ -43,3 +43,12 @@ land in `docs/protocol-rpc.md` and `docs/protocol-crypto.md`.
 Only the protocol contract is reproduced (identifiers, field names, framing,
 crypto parameters) — the minimum required for interoperable software. No
 proprietary code, binaries, or decompiler output are committed. See `NOTICE`.
+
+## Dynamic-validation findings (against running reference nvpair-node-info 0.13.3)
+- `/v1/node-info` wire shape confirmed and matched: GPU `{name, vram_bytes,
+  vram_used_bytes?, utilization_percent?}`, `cpu {name, cores}`, `memory
+  {total_bytes}`, `telemetryValid`, `msSince`, `hostUuid`. [done]
+- Gap: AMD GPU **static inventory** must come from the OS (ghw/WMI/sysfs), not
+  only `amd-smi`/`rocm-smi` — reference enumerates an AMD iGPU with no ROCm
+  tools present. [todo: pair-nodeinfo OS GPU inventory]
+- Gap: CPU/memory detection is `/proc`-only (Linux); add Windows/macOS. [todo]

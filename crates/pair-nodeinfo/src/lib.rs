@@ -22,13 +22,14 @@ pub fn collect(node_uuid: Option<String>, cluster_uuid: Option<String>) -> NodeI
     let gpus = detect_gpus();
     let telemetry_valid = gpus.iter().any(|g| g.vram_used_bytes.is_some() || g.utilization_percent.is_some());
     NodeInfo {
+        gpus,
+        cpu: host::cpu(),
+        memory: host::memory(),
+        telemetry_valid,
+        ms_since: 0,
         host_uuid: host::host_uuid(),
         node_uuid,
         cluster_uuid,
-        cpu: host::cpu(),
-        memory: host::memory(),
-        gpus,
-        telemetry_valid,
     }
 }
 
@@ -75,8 +76,8 @@ mod host {
         let sockets = physical_ids.len().max(1) as u32;
         let total_cores = cores_per_socket.map(|c| c * sockets);
         Some(Cpu {
-            model: model.unwrap_or_else(|| "unknown".into()),
-            total_cores,
+            name: model.unwrap_or_else(|| "unknown".into()),
+            cores: total_cores,
             total_threads: if logical > 0 { Some(logical) } else { None },
             utilization_percent: None,
         })

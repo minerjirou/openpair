@@ -58,7 +58,10 @@ async fn handle(
             .unwrap());
     }
     // TODO(perf): cache telemetry with a periodic refresh instead of per-request.
-    let ni = pair_nodeinfo::collect(Some((*node_id).clone()), None);
+    let mut ni = pair_nodeinfo::collect(Some((*node_id).clone()), None);
+    // Match the reference lean shape: the reported node id travels in `hostUuid`.
+    ni.host_uuid = Some((*node_id).clone());
+    ni.node_uuid = None;
     let body = serde_json::to_vec(&ni).unwrap_or_else(|_| b"{}".to_vec());
     Ok(Response::builder()
         .status(200)
