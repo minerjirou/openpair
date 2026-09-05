@@ -11,3 +11,4 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }

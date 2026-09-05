@@ -6,6 +6,7 @@
 //! AMD box participates in the cluster on equal footing.
 
 pub mod amd;
+pub mod gpu_os;
 pub mod nvidia;
 
 use pair_proto::{Cpu, Gpu, MemoryInfo, NodeInfo};
@@ -14,6 +15,15 @@ use pair_proto::{Cpu, Gpu, MemoryInfo, NodeInfo};
 pub fn detect_gpus() -> Vec<Gpu> {
     let mut gpus = nvidia::detect();
     gpus.extend(amd::detect());
+    // OS-level inventory (Windows WMI / macOS system_profiler) fills GPUs that no
+    // vendor tool reported -- e.g. an AMD iGPU with no ROCm tools installed. Skip
+    // vendors a tool already covered (their VRAM/util are more accurate).
+    let covered: std::collections::HashSet<_> = gpus.iter().map(|g| g.vendor).collect();
+    for g in gpu_os::os_gpus() {
+        if !covered.contains(&g.vendor) {
+            gpus.push(g);
+        }
+    }
     gpus
 }
 
@@ -51,52 +61,38 @@ mod host {
         None
     }
 
+    /// Portable CPU detection (Windows / macOS / Linux) via `sysinfo`.
     pub fn cpu() -> Option<Cpu> {
-        let text = std::fs::read_to_string("/proc/cpuinfo").ok()?;
-        let mut model = None;
-        let mut logical = 0u32;
-        let mut physical_ids = std::collections::BTreeSet::new();
-        let mut cores_per_socket = None;
-        for line in text.lines() {
-            if let Some((k, v)) = line.split_once(':') {
-                let (k, v) = (k.trim(), v.trim());
-                match k {
-                    "model name" if model.is_none() => model = Some(v.to_string()),
-                    "processor" => logical += 1,
-                    "physical id" => {
-                        physical_ids.insert(v.to_string());
-                    }
-                    "cpu cores" if cores_per_socket.is_none() => {
-                        cores_per_socket = v.parse::<u32>().ok()
-                    }
-                    _ => {}
-                }
-            }
+        let mut sys = sysinfo::System::new();
+        sys.refresh_cpu_all();
+        let cpus = sys.cpus();
+        if cpus.is_empty() {
+            return None;
         }
-        let sockets = physical_ids.len().max(1) as u32;
-        let total_cores = cores_per_socket.map(|c| c * sockets);
+        let name = cpus[0].brand().trim().to_string();
+        let name = if name.is_empty() {
+            cpus[0].vendor_id().trim().to_string()
+        } else {
+            name
+        };
+        let cores = sys.physical_core_count().map(|c| c as u32);
         Some(Cpu {
-            name: model.unwrap_or_else(|| "unknown".into()),
-            cores: total_cores,
-            total_threads: if logical > 0 { Some(logical) } else { None },
+            name: if name.is_empty() { "unknown".into() } else { name },
+            cores,
+            total_threads: Some(cpus.len() as u32),
             utilization_percent: None,
         })
     }
 
+    /// Portable memory detection via `sysinfo` (values are bytes in 0.30+).
     pub fn memory() -> Option<MemoryInfo> {
-        let text = std::fs::read_to_string("/proc/meminfo").ok()?;
-        let mut total_kb = None;
-        let mut avail_kb = None;
-        for line in text.lines() {
-            if let Some(rest) = line.strip_prefix("MemTotal:") {
-                total_kb = rest.split_whitespace().next().and_then(|n| n.parse::<u64>().ok());
-            } else if let Some(rest) = line.strip_prefix("MemAvailable:") {
-                avail_kb = rest.split_whitespace().next().and_then(|n| n.parse::<u64>().ok());
-            }
+        let mut sys = sysinfo::System::new();
+        sys.refresh_memory();
+        let total = sys.total_memory();
+        if total == 0 {
+            return None;
         }
-        let total = total_kb? * 1024;
-        let used = avail_kb.map(|a| total.saturating_sub(a * 1024));
-        Some(MemoryInfo { total_bytes: total, used_bytes: used })
+        Some(MemoryInfo { total_bytes: total, used_bytes: Some(sys.used_memory()) })
     }
 }
 
