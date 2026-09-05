@@ -108,18 +108,67 @@ async fn main() -> anyhow::Result<()> {
     });
     info!(%ingress_bind, "serving mutual-TLS /ingress for peers");
 
-    // 5. Local reverse proxy (loopback -> local engine).
-    let backend_for_proxy = backend.clone();
-    tokio::spawn(async move {
-        if let Err(e) =
-            pair_proxy::server::serve_local(proxy_bind, backend_for_proxy, std::future::pending()).await
-        {
-            warn!(error = %e, "proxy exited");
-        }
-    });
-    info!(%proxy_bind, backend = %backend, "loopback Ollama/OpenAI proxy up");
+    // 5. Routing table + model pollers + cluster-aware loopback proxy.
+    let routing = Arc::new(RwLock::new(pair_proxy::RoutingTable::new(node_id.clone())));
+    let id_arc = Arc::new(identity.clone());
 
-    // 6. Discovery: advertise + browse.
+    // Poll the local engine's model list.
+    {
+        let routing = routing.clone();
+        let backend = backend.clone();
+        tokio::spawn(async move {
+            loop {
+                match pair_proxy::tags::fetch_local_models(&backend).await {
+                    Ok(models) => {
+                        let n = models.len();
+                        routing.write().unwrap().set_local_models(models);
+                        tracing::debug!(models = n, "refreshed local models");
+                    }
+                    Err(e) => tracing::debug!(error = %e, "local /api/tags unavailable"),
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+            }
+        });
+    }
+
+    // Poll pinned peers' models through mutual-TLS /ingress.
+    {
+        let routing = routing.clone();
+        let pins = pins.clone();
+        let id_arc = id_arc.clone();
+        tokio::spawn(async move {
+            loop {
+                let peers = routing.read().unwrap().pinned_peers();
+                for (nid, host, port) in peers {
+                    if let Ok(models) =
+                        pair_proxy::tags::fetch_peer_models(&id_arc, pins.clone(), &host, port).await
+                    {
+                        routing.write().unwrap().set_peer_models(&nid, models);
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+            }
+        });
+    }
+
+    // Cluster-aware proxy: routes each request to the local engine or a pinned
+    // peer that advertises the requested model.
+    {
+        let ctx = pair_proxy::ProxyContext {
+            backend: backend.clone(),
+            identity: id_arc.clone(),
+            pins: pins.clone(),
+            routing: routing.clone(),
+        };
+        tokio::spawn(async move {
+            if let Err(e) = pair_proxy::serve_routing(proxy_bind, ctx, std::future::pending()).await {
+                warn!(error = %e, "proxy exited");
+            }
+        });
+    }
+    info!(%proxy_bind, backend = %backend, "cluster-aware Ollama/OpenAI proxy up");
+
+    // 6. Discovery: advertise + browse -> populate the routing table.
     let discovery = Discovery::new()?;
     let mut record = NodeRecord::default();
     record.node_uuid = Some(node_id.clone());
@@ -130,12 +179,30 @@ async fn main() -> anyhow::Result<()> {
         info!(port = advertise_port, "advertising _nvpair-node._tcp");
     }
     let peers = discovery.browse()?;
-    tokio::task::spawn_blocking(move || {
-        while let Ok(peer) = peers.recv() {
-            info!(instance = %peer.instance, host = %peer.host, port = peer.port,
-                  node = ?peer.record.node_uuid, "discovered peer");
-        }
-    });
+    {
+        let routing = routing.clone();
+        let pins = pins.clone();
+        let self_id = node_id.clone();
+        tokio::task::spawn_blocking(move || {
+            while let Ok(peer) = peers.recv() {
+                let pnid = match peer.record.node_uuid.clone() {
+                    Some(id) if id != self_id => id,
+                    _ => continue,
+                };
+                let host = peer
+                    .addresses
+                    .first()
+                    .map(|a| a.to_string())
+                    .unwrap_or_else(|| peer.host.trim_end_matches('.').to_string());
+                let pinned = pins.read().unwrap().get(&pnid).is_some();
+                routing
+                    .write()
+                    .unwrap()
+                    .upsert_peer_meta(&pnid, host, peer.port, pinned);
+                info!(peer = %pnid, port = peer.port, pinned, "peer added to routing");
+            }
+        });
+    }
 
     info!("openpair-node running (Ctrl-C to stop)");
     tokio::signal::ctrl_c().await?;

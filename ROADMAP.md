@@ -30,7 +30,7 @@ land in `docs/protocol-rpc.md` and `docs/protocol-crypto.md`.
 - [ ] membership: signed endorsement / tombstone verify + apply
 
 ### Phase 3 — data plane
-- [~] `pair-proxy`: local reverse proxy + model routing + ingress envelope done; peer mTLS routing next
+- [x] `pair-proxy`: local + cluster-aware peer routing (model-based select -> mTLS /ingress), model discovery via /api/tags
 - [ ] cluster `/ingress` over mTLS; candidate selection by advertised model + priority
 - [ ] `pair-node` supervisor: wire discovery + trust + nodeinfo + proxy together
 

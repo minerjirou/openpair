@@ -83,7 +83,8 @@ async fn handle(
     };
     let path = env.path.unwrap_or_else(|| "/".to_string());
     let data = env.data.unwrap_or_default();
-    let reply = match forward_raw(&backend, "POST", &path, Bytes::from(data.into_bytes())).await {
+    let method = env.method.as_deref().unwrap_or("POST");
+    let reply = match forward_raw(&backend, method, &path, Bytes::from(data.into_bytes())).await {
         Ok((code, bytes)) => IngressEnvelope {
             code: Some(code),
             data: Some(String::from_utf8_lossy(&bytes).into_owned()),

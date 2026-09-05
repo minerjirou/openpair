@@ -17,6 +17,12 @@ pub struct IngressEnvelope {
     /// Upstream path to hit on the peer's local engine (e.g. `/api/generate`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// HTTP method for the wrapped request (openpair extension; defaults to POST
+    /// on the receive side). The reference envelope omits this — for reference
+    /// interop the method is a [live] item; this field only affects
+    /// openpair<->openpair routing (e.g. probing a peer's `GET /api/tags`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
     /// Model / target name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,

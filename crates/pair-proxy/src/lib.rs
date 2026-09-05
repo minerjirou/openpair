@@ -17,14 +17,19 @@
 pub mod backend;
 pub mod ingress;
 pub mod ingress_server;
+pub mod live;
+pub mod routing;
 pub mod model;
 pub mod peer;
 pub mod router;
 pub mod server;
+pub mod tags;
 
 pub use ingress::IngressEnvelope;
 pub use model::{extract_model, normalize_model_key};
 pub use router::{select, Candidate};
+pub use routing::{PeerEntry, RoutingTable};
+pub use live::{serve_routing, ProxyContext};
 
 /// Where a local application connects and which protocols are accepted.
 #[derive(Debug, Clone)]

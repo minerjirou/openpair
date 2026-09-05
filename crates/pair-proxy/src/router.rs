@@ -23,6 +23,10 @@ pub struct Candidate {
     pub priority_rank: Option<u32>,
     /// Explicit manual selection wins over priority.
     pub manually_selected: bool,
+    /// Peer address for cluster routing (host + mTLS `/ingress` port); `None`
+    /// for the local node.
+    pub host: Option<String>,
+    pub ingress_port: Option<u16>,
 }
 
 /// Pick the best candidate for a model from the given set, or `None` if nothing
@@ -68,6 +72,8 @@ mod tests {
             pinned,
             priority_rank: rank,
             manually_selected: manual,
+            host: None,
+            ingress_port: None,
         }
     }
 
