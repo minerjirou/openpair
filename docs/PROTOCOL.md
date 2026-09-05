@@ -1,5 +1,7 @@
 # openpair interoperability contract
 
+*日本語: [PROTOCOL.ja.md](PROTOCOL.ja.md)*
+
 This is the wire contract `openpair` implements to interoperate with a PAIR
 LAN inference cluster. It records only the *interface* (identifiers, framing,
 schemas, cryptographic parameters) — the minimum needed for interoperable

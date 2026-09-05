@@ -1,5 +1,7 @@
 # ROCm / AMD end-to-end validation
 
+*日本語: [ROCM_E2E.ja.md](ROCM_E2E.ja.md)*
+
 The AMD detection + telemetry path is implemented across all platforms:
 
 | Platform | Static inventory | Live VRAM-used / utilization |

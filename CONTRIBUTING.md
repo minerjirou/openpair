@@ -1,5 +1,7 @@
 # Contributing to openpair
 
+*日本語: [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md)*
+
 Thanks for your interest! openpair is a clean-room, interoperable implementation
 and we intend to keep it that way.
 

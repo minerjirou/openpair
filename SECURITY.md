@@ -1,5 +1,7 @@
 # Security Policy
 
+*日本語: [SECURITY.ja.md](SECURITY.ja.md)*
+
 openpair implements cryptographic pairing and mutual-TLS trust, so we take
 security reports seriously.
 

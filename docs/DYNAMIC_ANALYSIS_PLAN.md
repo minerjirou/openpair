@@ -1,5 +1,7 @@
 # Dynamic-analysis plan — closing the `[live]` items
 
+*日本語: [DYNAMIC_ANALYSIS_PLAN.ja.md](DYNAMIC_ANALYSIS_PLAN.ja.md)*
+
 Static analysis pinned the protocol down to a handful of byte-exact
 serializations that can only be confirmed by observing the running reference.
 This plan captures exactly what to observe and how, so byte-exact interop can be

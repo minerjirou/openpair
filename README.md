@@ -7,6 +7,8 @@ first-class AMD / ROCm GPU support.**
 [![CI](https://github.com/OWNER/openpair/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/openpair/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 
+*日本語: [README.ja.md](README.ja.md)*
+
 > **Independent reimplementation.** openpair contains **no third-party source
 > code**. Only the *interoperability contract* of the protocol (network service
 > identifiers, message field names, wire framing, and the cryptographic

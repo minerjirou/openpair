@@ -1,5 +1,7 @@
 # openpair development roadmap
 
+*日本語: [ROADMAP.ja.md](ROADMAP.ja.md)*
+
 Goal: a clean-room, Rust node that (a) **interoperates with real PAIR clusters**
 and (b) adds **ROCm/AMD** GPU support, with no third-party source reuse.
 

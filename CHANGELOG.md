@@ -23,6 +23,8 @@ yet made a tagged release.
   engine or a pinned peer over mutual-TLS `/ingress`.
 - Documentation: `docs/PROTOCOL.md`, `docs/ROCM_E2E.md`,
   `docs/DYNAMIC_ANALYSIS_PLAN.md`, `ROADMAP.md`.
+- Japanese documentation (`*.ja.md`): README, CONTRIBUTING, SECURITY, ROADMAP,
+  and the `docs/` guides, cross-linked with the English versions.
 
 ### Known limitations
 - Some byte-exact EAP-NOOB serializations are marked `TODO(interop)` pending a
