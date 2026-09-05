@@ -4,7 +4,7 @@
 *Personal AI Router* (PAIR) LAN AI-inference clustering protocol — with
 first-class AMD / ROCm GPU support.**
 
-[![CI](https://github.com/OWNER/openpair/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/openpair/actions/workflows/ci.yml)
+[![CI](https://github.com/minerjirou/openpair/actions/workflows/ci.yml/badge.svg)](https://github.com/minerjirou/openpair/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 
 *日本語: [README.ja.md](README.ja.md)*
