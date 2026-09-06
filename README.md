@@ -95,6 +95,8 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 ## Documentation
 
+- [`docs/USAGE.md`](docs/USAGE.md) — user manual: install, run, configure, join a
+  cluster, use the proxy, troubleshoot.
 - [`docs/PROTOCOL.md`](docs/PROTOCOL.md) — the interoperability contract, each
   item tagged **[confirmed]** or **[live]** (pending dynamic capture).
 - [`docs/PAIRING.md`](docs/PAIRING.md) — cluster pairing (EAP-NOOB) end to end:

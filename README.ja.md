@@ -90,6 +90,8 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 ## ドキュメント
 
+- [`docs/USAGE.ja.md`](docs/USAGE.ja.md) — 使い方マニュアル：導入・起動・設定・クラスタ参加・
+  プロキシ利用・トラブルシュート。
 - [`docs/PROTOCOL.ja.md`](docs/PROTOCOL.ja.md) — 相互運用契約。各項目に **[confirmed]**
   または **[live]**（動的キャプチャで要確認）を付記。
 - [`docs/PAIRING.ja.md`](docs/PAIRING.ja.md) — クラスタ・ペアリング（EAP-NOOB）の全体像：
