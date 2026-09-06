@@ -33,6 +33,10 @@ openpair does two things:
 
 ## Features
 
+- **Join a real PAIR cluster** — full **EAP-NOOB (RFC 9140) PIN pairing** over
+  the `/v1/cluster/pairing` channel: the two-exchange handshake, `PairingInfo`
+  certificate binding, and certificate pinning that establishes mutual-TLS
+  trust. Drive it from the dashboard or via `openpair-node invite` / `join`.
 - **GPU telemetry, any vendor** — NVIDIA (`nvidia-smi`), AMD (kernel `amdgpu`
   sysfs — *no ROCm tools needed* — or `amd-smi`/`rocm-smi`), and OS-level
   inventory (Windows WMI, macOS `system_profiler`). Cross-platform CPU/memory
@@ -41,11 +45,11 @@ openpair does two things:
 - **Cluster trust** — Ed25519 node certificates, certificate **pinning**, and
   **TLS 1.3 mutual auth**; a reference-compatible `node.crt` / `node.key` /
   `trusted/` cluster directory.
-- **EAP-NOOB (RFC 9140) pairing primitives** — X25519 / P-256 cryptosuites, the
-  NIST SP 800-56C one-step KDF, HMAC-SHA256 confirmation.
 - **Data plane** — a loopback Ollama (`/api/*`) / OpenAI (`/v1/*`) reverse proxy
   that routes each request to the local engine or a pinned peer that advertises
   the requested model, forwarding over mutual-TLS `/ingress`.
+- **Web dashboard** — node status, hardware, discovered peers and routing, and
+  cluster-pairing controls (invite a node, respond to an invite). Loopback-bound.
 - One integrated daemon: `openpair-node`.
 
 ## Workspace layout
@@ -56,11 +60,12 @@ openpair does two things:
 | [`pair-rpc`](crates/pair-rpc) | newline-delimited JSON-RPC 2.0 stdio transport |
 | [`pair-nodeinfo`](crates/pair-nodeinfo) | CPU/memory + GPU telemetry (NVIDIA / AMD / OS inventory) |
 | [`pair-discovery`](crates/pair-discovery) | mDNS `_nvpair-node._tcp` advertise + browse |
-| [`pair-trust`](crates/pair-trust) | Ed25519 identity, cert pinning, mutual-TLS, cluster dir |
-| [`pair-pairing`](crates/pair-pairing) | EAP-NOOB (RFC 9140) cryptosuites, KDF, MACs, messages |
+| [`pair-trust`](crates/pair-trust) | Ed25519 identity, cert pinning, mutual-TLS, cluster dir, membership signatures |
+| [`pair-pairing`](crates/pair-pairing) | EAP-NOOB (RFC 9140): cryptosuites, KDF, MACs, and the Server/Peer state machines (Types 1-6) |
+| [`pair-cluster`](crates/pair-cluster) | cluster pairing transport: `PairingInfo`, the `/v1/cluster/pairing` envelope, and the join/invite drivers |
 | [`pair-proxy`](crates/pair-proxy) | reverse proxy, model-based routing, mTLS `/ingress` |
-| [`pair-ui`](crates/pair-ui) | node web dashboard + control API (pairing, status) |
-| [`pair-node`](crates/pair-node) | the `openpair-node` daemon |
+| [`pair-ui`](crates/pair-ui) | node web dashboard + control API (status, cluster pairing) |
+| [`pair-node`](crates/pair-node) | the `openpair-node` daemon (+ `invite` / `join` subcommands) |
 
 ## Quick start
 
@@ -80,6 +85,20 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 #   http://127.0.0.1:7070
 ```
 
+### Join a cluster
+
+Pairing uses a six-digit PIN (EAP-NOOB): the inviter shows it, the joiner enters
+it. From the dashboard's **Cluster pairing** card, or the CLI:
+
+```sh
+# on the joining node — waits to be invited, then prompts for the PIN
+openpair-node join
+# on the inviting node — prints an invite id + PIN; drives the handshake
+openpair-node invite <joiner-host>
+```
+
+See [`docs/USAGE.md`](docs/USAGE.md) and [`docs/PAIRING.md`](docs/PAIRING.md).
+
 ### Configuration (environment)
 
 | Variable | Default | Meaning |
@@ -88,6 +107,7 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 | `OPENPAIR_PROXY_BIND` | `127.0.0.1:11435` | loopback Ollama/OpenAI proxy |
 | `OPENPAIR_NODEINFO_BIND` | `127.0.0.1:7071` | `GET /v1/node-info` |
 | `OPENPAIR_INGRESS_BIND` | `0.0.0.0:7443` | mutual-TLS `/ingress` for peers |
+| `OPENPAIR_PAIRING_BIND` | `0.0.0.0:14321` | cluster pairing `/v1/cluster/pairing` |
 | `OPENPAIR_UI_BIND` | `127.0.0.1:7070` | web dashboard + control API |
 | `OPENPAIR_ADVERTISE_PORT` | node-info port | mDNS advertised port |
 | `OPENPAIR_CLUSTER_DIR` | — | reference-compatible trust dir (`node.crt`/`node.key`/`trusted/`) |
@@ -110,13 +130,19 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 ## Status
 
-Early but functional and tested (60+ unit/integration tests). The
-statically-determinable protocol surface is implemented and verified, including
-live checks against real hardware and the reference `nvpair-node-info` worker
-(the `/v1/node-info` wire shape matches). A short list of byte-exact pairing
-serializations still needs confirmation from a live two-node capture — these are
-clearly marked `TODO(interop)` in the source and enumerated in
-`docs/DYNAMIC_ANALYSIS_PLAN.md`.
+Functional and tested (80+ unit/integration tests; CI on Linux, Windows, and
+macOS). The protocol surface is implemented and verified, including live checks
+against real hardware and the reference `nvpair-node-info` worker (the
+`/v1/node-info` wire shape matches).
+
+**Cluster pairing (EAP-NOOB)** is implemented from the upstream Apache-2.0 source
+and verified end to end between two openpair nodes — the full two-exchange
+handshake, `PairingInfo` certificate authentication, mutual certificate pinning,
+and wrong-PIN handling — over real HTTP and between two live daemons (both via
+the CLI and the dashboard API). The reconnect exchange (Types 7-9) is reserved /
+unimplemented upstream and not needed for interop. Field interop against a real
+reference PAIR cluster remains to be validated on hardware; the remaining
+byte-exact items are enumerated in `docs/DYNAMIC_ANALYSIS_PLAN.md`.
 
 ## Contributing
 

@@ -30,17 +30,21 @@ openpair は次の 2 つを実現します：
 
 ## 特徴
 
+- **実 PAIR クラスタへの参加** — `/v1/cluster/pairing` チャネル上の完全な
+  **EAP-NOOB（RFC 9140）PIN ペアリング**：2 交換ハンドシェイク、`PairingInfo` による
+  証明書束縛、証明書ピン留めで相互 TLS 信頼を確立。ダッシュボード、または
+  `openpair-node invite` / `join` で操作します。
 - **ベンダー非依存の GPU テレメトリ** — NVIDIA（`nvidia-smi`）、AMD（カーネル `amdgpu`
   sysfs＝*ROCm ツール不要*、または `amd-smi`/`rocm-smi`）、OS レベルの列挙（Windows WMI、
   macOS `system_profiler`）。CPU/メモリは `sysinfo` でクロスプラットフォーム対応。
 - **mDNS 探索** — `_nvpair-node._tcp` サービスの広告と発見。
 - **クラスタ信頼** — Ed25519 ノード証明書、証明書**ピンニング**、**TLS 1.3 相互認証**。
   参照互換の `node.crt` / `node.key` / `trusted/` クラスタディレクトリ。
-- **EAP-NOOB（RFC 9140）ペアリングのプリミティブ** — X25519 / P-256 スイート、
-  NIST SP 800-56C one-step KDF、HMAC-SHA256 による確認。
 - **データプレーン** — loopback の Ollama（`/api/*`）/ OpenAI（`/v1/*`）リバースプロキシ。
   リクエストごとにローカルエンジン、または対象モデルを広告する pin 済み peer を選び、
   mutual TLS `/ingress` へ転送します。
+- **Web ダッシュボード** — ノード状態・ハード情報・探索済み peer とルーティング・
+  クラスタペアリング操作（招待・参加）。loopback バインド。
 - 統合デーモン 1 本：`openpair-node`。
 
 ## ワークスペース構成
@@ -51,11 +55,12 @@ openpair は次の 2 つを実現します：
 | [`pair-rpc`](crates/pair-rpc) | 改行区切り JSON-RPC 2.0 stdio トランスポート |
 | [`pair-nodeinfo`](crates/pair-nodeinfo) | CPU/メモリ＋GPU テレメトリ（NVIDIA / AMD / OS 列挙） |
 | [`pair-discovery`](crates/pair-discovery) | mDNS `_nvpair-node._tcp` の広告＋発見 |
-| [`pair-trust`](crates/pair-trust) | Ed25519 アイデンティティ、証明書 pin、mutual TLS、クラスタ dir |
-| [`pair-pairing`](crates/pair-pairing) | EAP-NOOB（RFC 9140）スイート、KDF、MAC、メッセージ |
+| [`pair-trust`](crates/pair-trust) | Ed25519 アイデンティティ、証明書 pin、mutual TLS、クラスタ dir、メンバーシップ署名 |
+| [`pair-pairing`](crates/pair-pairing) | EAP-NOOB（RFC 9140）：スイート、KDF、MAC、および Server/Peer 状態機械（Type 1-6） |
+| [`pair-cluster`](crates/pair-cluster) | クラスタ・ペアリング・トランスポート：`PairingInfo`、`/v1/cluster/pairing` エンベロープ、join/invite ドライバ |
 | [`pair-proxy`](crates/pair-proxy) | リバースプロキシ、モデルベースのルーティング、mTLS `/ingress` |
-| [`pair-ui`](crates/pair-ui) | ノード Web ダッシュボード＋制御API（ペアリング・状態） |
-| [`pair-node`](crates/pair-node) | `openpair-node` デーモン |
+| [`pair-ui`](crates/pair-ui) | ノード Web ダッシュボード＋制御API（状態・クラスタペアリング） |
+| [`pair-node`](crates/pair-node) | `openpair-node` デーモン（＋ `invite` / `join` サブコマンド） |
 
 ## クイックスタート
 
@@ -75,6 +80,20 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 #   http://127.0.0.1:7070
 ```
 
+### クラスタに参加する
+
+ペアリングは 6 桁 PIN（EAP-NOOB）で行います。招く側が PIN を表示し、参加する側が入力します。
+ダッシュボードの **Cluster pairing** カード、または CLI で操作します：
+
+```sh
+# 参加する側 — 招待を待ち、PIN 入力を促される
+openpair-node join
+# 招く側 — invite id と PIN を表示し、ハンドシェイクを駆動
+openpair-node invite <参加ノードのhost>
+```
+
+詳細は [`docs/USAGE.ja.md`](docs/USAGE.ja.md) と [`docs/PAIRING.ja.md`](docs/PAIRING.ja.md)。
+
 ### 設定（環境変数）
 
 | 変数 | 既定値 | 意味 |
@@ -83,6 +102,7 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 | `OPENPAIR_PROXY_BIND` | `127.0.0.1:11435` | loopback の Ollama/OpenAI プロキシ |
 | `OPENPAIR_NODEINFO_BIND` | `127.0.0.1:7071` | `GET /v1/node-info` |
 | `OPENPAIR_INGRESS_BIND` | `0.0.0.0:7443` | peer 向け mutual TLS `/ingress` |
+| `OPENPAIR_PAIRING_BIND` | `0.0.0.0:14321` | クラスタ・ペアリング `/v1/cluster/pairing` |
 | `OPENPAIR_UI_BIND` | `127.0.0.1:7070` | Web ダッシュボード＋制御API |
 | `OPENPAIR_ADVERTISE_PORT` | node-infoポート | mDNS 広告ポート |
 | `OPENPAIR_CLUSTER_DIR` | — | 参照互換の信頼 dir（`node.crt`/`node.key`/`trusted/`） |
@@ -103,11 +123,16 @@ curl -s http://127.0.0.1:7071/v1/node-info | jq
 
 ## ステータス
 
-初期段階ですが動作し、テスト済みです（60 以上のユニット/統合テスト）。静的に確定できる
+動作し、テスト済みです（80 以上のユニット/統合テスト。CI は Linux / Windows / macOS）。
 プロトコル面は実装・検証済みで、実ハードウェアおよび参照 `nvpair-node-info` ワーカーに
-対するライブ確認（`/v1/node-info` のワイヤ形状が一致）も含みます。ペアリングの一部 byte
-厳密なシリアライズはライブ 2 ノードのキャプチャで確定する必要があり、ソース内で
-`TODO(interop)` として明示、`docs/DYNAMIC_ANALYSIS_PLAN.ja.md` に列挙しています。
+対するライブ確認（`/v1/node-info` のワイヤ形状が一致）も含みます。
+
+**クラスタ・ペアリング（EAP-NOOB）** は上流 Apache-2.0 ソースから実装し、openpair 2 ノード
+間で E2E 検証済みです — 2 交換のフルハンドシェイク、`PairingInfo` 証明書認証、相互証明書
+ピン留め、PIN 誤りの扱い — を実 HTTP・実デーモン 2 プロセス間で（CLI とダッシュボード API
+の双方から）確認しています。再接続交換（Type 7-9）は上流で reserved / 未実装のため interop
+には不要です。実物の参照 PAIR クラスタとの実地 interop は実機検証が残タスクで、残る byte
+厳密な項目は `docs/DYNAMIC_ANALYSIS_PLAN.ja.md` に列挙しています。
 
 ## コントリビュート
 
