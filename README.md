@@ -15,6 +15,13 @@ first-class AMD / ROCm GPU support.**
 > interoperate with PAIR clusters and is informed by the upstream source. Both
 > projects are Apache-2.0. See [`NOTICE`](./NOTICE) and [Legal](#legal).
 
+> **⚠️ Experimental — not verified against a real PAIR cluster.** Pairing and the
+> data plane are verified only *between openpair nodes* and against the reference
+> `nvpair-node-info` worker's wire shape. openpair has **not** been tested end to
+> end against a running Personal AI Router cluster or its desktop app, so
+> interoperability with the real software is **unconfirmed**. Treat this as a
+> research prototype.
+
 ---
 
 ## Why
