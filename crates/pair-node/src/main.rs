@@ -166,7 +166,9 @@ async fn main() -> anyhow::Result<()> {
     let pairing_node = {
         let pairing_bind: std::net::SocketAddr =
             env_or("OPENPAIR_PAIRING_BIND", DEFAULT_PAIRING_BIND).parse()?;
-        let cluster_dir = std::env::var("OPENPAIR_CLUSTER_DIR").ok().map(PathBuf::from);
+        let cluster_dir = std::env::var("OPENPAIR_CLUSTER_DIR")
+            .ok()
+            .map(PathBuf::from);
         let sink = pairing::ClusterTrustSink::new(
             pins.clone(),
             cluster_dir,
@@ -394,9 +396,8 @@ async fn pairing_endpoint() -> anyhow::Result<(
 /// Inviter: drive an Initial Exchange to `joiner`, print the PIN, and wait for
 /// the joiner to complete the join (§7.2).
 async fn run_invite(joiner: Option<String>) -> anyhow::Result<()> {
-    let joiner = joiner.ok_or_else(|| {
-        anyhow::anyhow!("usage: openpair-node invite <joiner-host[:port]>")
-    })?;
+    let joiner = joiner
+        .ok_or_else(|| anyhow::anyhow!("usage: openpair-node invite <joiner-host[:port]>"))?;
     let joiner_addr = normalize_pairing_addr(&joiner);
     let (node, sink, _bind) = pairing_endpoint().await?;
 
@@ -457,7 +458,11 @@ async fn run_join() -> anyhow::Result<()> {
 
 /// Normalize a bare `host` to `host:14321`, leaving an explicit port intact.
 fn normalize_pairing_addr(input: &str) -> String {
-    if input.rsplit_once(':').map(|(_, p)| p.parse::<u16>().is_ok()) == Some(true) {
+    if input
+        .rsplit_once(':')
+        .map(|(_, p)| p.parse::<u16>().is_ok())
+        == Some(true)
+    {
         input.to_string()
     } else {
         format!("{input}:{}", pair_cluster::DEFAULT_PAIRING_PORT)

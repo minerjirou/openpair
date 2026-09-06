@@ -92,10 +92,16 @@ pub struct Reply {
 
 impl Reply {
     fn ok(envelope: PairingEnvelope) -> Self {
-        Self { status: 200, envelope }
+        Self {
+            status: 200,
+            envelope,
+        }
     }
     fn conflict(envelope: PairingEnvelope) -> Self {
-        Self { status: 409, envelope }
+        Self {
+            status: 409,
+            envelope,
+        }
     }
 }
 
@@ -197,7 +203,11 @@ impl PairingNode {
                         None
                     };
                     (
-                        Reply::ok(PairingEnvelope::with_msg(&env.invite_id, phase::INITIAL, &bytes)),
+                        Reply::ok(PairingEnvelope::with_msg(
+                            &env.invite_id,
+                            phase::INITIAL,
+                            &bytes,
+                        )),
                         pending,
                     )
                 }
@@ -242,7 +252,11 @@ impl PairingNode {
                 // Kickoff: emit the Server's first Completion message.
                 let out = s.start();
                 (
-                    Reply::ok(PairingEnvelope::with_msg(&env.invite_id, phase::COMPLETION, &out)),
+                    Reply::ok(PairingEnvelope::with_msg(
+                        &env.invite_id,
+                        phase::COMPLETION,
+                        &out,
+                    )),
                     None,
                 )
             } else {
@@ -309,7 +323,10 @@ impl PairingNode {
     /// Inviter: drive the Initial Exchange to `joiner_addr`, mint a PIN, and
     /// leave an [`InviterSession`] awaiting the joiner-driven Completion. Returns
     /// the `(inviteId, pin)` to display to the human.
-    pub async fn create_invite(self: &Arc<Self>, joiner_addr: &str) -> anyhow::Result<(String, String)> {
+    pub async fn create_invite(
+        self: &Arc<Self>,
+        joiner_addr: &str,
+    ) -> anyhow::Result<(String, String)> {
         let invite_id = uuid::Uuid::new_v4().to_string();
         let info = self.profile.pairing_info(None);
         let mut session = InviterSession::new(&info);
@@ -329,7 +346,9 @@ impl PairingNode {
             if step.done {
                 break;
             }
-            msg = step.send.ok_or_else(|| anyhow::anyhow!("inviter stalled in Initial"))?;
+            msg = step
+                .send
+                .ok_or_else(|| anyhow::anyhow!("inviter stalled in Initial"))?;
         }
         anyhow::ensure!(
             session.state() == State::Waiting,
@@ -348,7 +367,11 @@ impl PairingNode {
 
     /// Joiner: feed the PIN and drive the Completion Exchange to the inviter.
     /// On success the inviter is pinned and [`Paired`] is returned.
-    pub async fn submit_pin(self: &Arc<Self>, invite_id: &str, pin: &str) -> anyhow::Result<Paired> {
+    pub async fn submit_pin(
+        self: &Arc<Self>,
+        invite_id: &str,
+        pin: &str,
+    ) -> anyhow::Result<Paired> {
         if !pair_pairing::is_valid_pin(pin) {
             anyhow::bail!("pin must be six digits");
         }
@@ -372,8 +395,11 @@ impl PairingNode {
         };
 
         // Kickoff: empty msg so the inviter's Server.Start() emits the first blob.
-        let mut resp =
-            crate::http::post_pairing(&inviter_addr, &PairingEnvelope::signal(invite_id, phase::COMPLETION, "")).await?;
+        let mut resp = crate::http::post_pairing(
+            &inviter_addr,
+            &PairingEnvelope::signal(invite_id, phase::COMPLETION, ""),
+        )
+        .await?;
         let paired = loop {
             let step = {
                 let mut s = session.lock().await;
@@ -397,7 +423,11 @@ impl PairingNode {
                 }
                 // Mirror the failure to the inviter so it tears down immediately;
                 // only a definitive wrong-PIN carries reason:"incorrect-pin".
-                let reason_out = if step.auth_failed { reason::INCORRECT_PIN } else { "" };
+                let reason_out = if step.auth_failed {
+                    reason::INCORRECT_PIN
+                } else {
+                    ""
+                };
                 let _ = crate::http::post_pairing(
                     &inviter_addr,
                     &PairingEnvelope::signal(invite_id, phase::FAIL, reason_out),
@@ -407,11 +437,17 @@ impl PairingNode {
                 self.pending.lock().await.remove(invite_id);
                 anyhow::bail!(
                     "completion failed{}: {}",
-                    if step.auth_failed { " (incorrect pin)" } else { "" },
+                    if step.auth_failed {
+                        " (incorrect pin)"
+                    } else {
+                        ""
+                    },
                     step.error.unwrap_or_default()
                 );
             }
-            let send = step.send.ok_or_else(|| anyhow::anyhow!("joiner stalled in Completion"))?;
+            let send = step
+                .send
+                .ok_or_else(|| anyhow::anyhow!("joiner stalled in Completion"))?;
             resp = crate::http::post_pairing(
                 &inviter_addr,
                 &PairingEnvelope::with_msg(invite_id, phase::COMPLETION, &send),

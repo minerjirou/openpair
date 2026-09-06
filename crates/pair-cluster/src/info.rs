@@ -67,8 +67,8 @@ impl PairingInfo {
 /// certificate DER for pinning. v1 peers with no admission epoch are normalized
 /// to [`LEGACY_ADMISSION_EPOCH`].
 pub fn parse_pairing_info(raw: &[u8]) -> anyhow::Result<(PairingInfo, Vec<u8>)> {
-    let mut pi: PairingInfo = serde_json::from_slice(raw)
-        .map_err(|e| anyhow::anyhow!("decode PairingInfo: {e}"))?;
+    let mut pi: PairingInfo =
+        serde_json::from_slice(raw).map_err(|e| anyhow::anyhow!("decode PairingInfo: {e}"))?;
     anyhow::ensure!(!pi.node_uuid.is_empty(), "PairingInfo missing nodeUuid");
     let der = pair_trust::identity::pem_cert_to_der(&pi.cert)
         .ok_or_else(|| anyhow::anyhow!("PairingInfo has no CERTIFICATE block"))?;

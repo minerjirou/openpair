@@ -488,7 +488,10 @@ impl Server {
         let kmp = self.m.keym.as_ref().unwrap().kmp;
         let expected = compute_mac(&kmp, 1, &self.m.inp);
         if !mac_equal(&macp, &expected) {
-            return self.fail_code(error_code::HMAC_VERIFICATION_FAILED, "MACp verification failed");
+            return self.fail_code(
+                error_code::HMAC_VERIFICATION_FAILED,
+                "MACp verification failed",
+            );
         }
         self.assoc = Some(self.finish());
         self.state = State::Registered;
@@ -800,7 +803,10 @@ impl Peer {
         self.m.derive();
         let kms = self.m.keym.as_ref().unwrap().kms;
         if !mac_equal(&macs, &compute_mac(&kms, 2, &self.m.inp)) {
-            return self.fail_code(error_code::HMAC_VERIFICATION_FAILED, "MACs verification failed");
+            return self.fail_code(
+                error_code::HMAC_VERIFICATION_FAILED,
+                "MACs verification failed",
+            );
         }
         let kmp = self.m.keym.as_ref().unwrap().kmp;
         let macp = compute_mac(&kmp, 1, &self.m.inp);

@@ -24,7 +24,11 @@ pub struct ClusterTrustSink {
 }
 
 impl ClusterTrustSink {
-    pub fn new(pins: SharedPins, cluster_dir: Option<PathBuf>, already_clustered: bool) -> Arc<Self> {
+    pub fn new(
+        pins: SharedPins,
+        cluster_dir: Option<PathBuf>,
+        already_clustered: bool,
+    ) -> Arc<Self> {
         Arc::new(Self {
             pins,
             cluster_dir,
@@ -32,7 +36,6 @@ impl ClusterTrustSink {
             cluster_id: Mutex::new(String::new()),
         })
     }
-
 }
 
 impl TrustSink for ClusterTrustSink {

@@ -253,7 +253,11 @@ async fn respond(ctx: &UiContext, body: &[u8]) -> anyhow::Result<serde_json::Val
 
 /// Normalize a bare `host` to `host:14321`, leaving an explicit port intact.
 fn normalize_pairing_addr(input: &str) -> String {
-    if input.rsplit_once(':').map(|(_, p)| p.parse::<u16>().is_ok()) == Some(true) {
+    if input
+        .rsplit_once(':')
+        .map(|(_, p)| p.parse::<u16>().is_ok())
+        == Some(true)
+    {
         input.to_string()
     } else {
         format!("{input}:{}", pair_cluster::DEFAULT_PAIRING_PORT)

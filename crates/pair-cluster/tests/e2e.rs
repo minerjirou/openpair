@@ -59,7 +59,12 @@ async fn spawn_node(name: &str, cluster_id: &str, friendly: &str) -> TestNode {
     });
     // Give the listener a moment to come up.
     tokio::time::sleep(Duration::from_millis(50)).await;
-    TestNode { node, sink, addr, cert_der }
+    TestNode {
+        node,
+        sink,
+        addr,
+        cert_der,
+    }
 }
 
 #[tokio::test]
@@ -131,10 +136,7 @@ async fn wrong_pin_fails_and_pins_nothing() {
         .submit_pin(&invite_id, &wrong)
         .await
         .expect_err("wrong pin must fail");
-    assert!(
-        err.to_string().contains("incorrect pin"),
-        "got: {err}"
-    );
+    assert!(err.to_string().contains("incorrect pin"), "got: {err}");
 
     assert!(joiner.sink.pinned.lock().unwrap().is_empty());
     assert!(inviter.sink.pinned.lock().unwrap().is_empty());

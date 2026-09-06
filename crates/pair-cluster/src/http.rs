@@ -51,7 +51,11 @@ pub async fn post_pairing(addr: &str, env: &PairingEnvelope) -> anyhow::Result<P
         anyhow::bail!("pairing 409: {}", String::from_utf8_lossy(&bytes));
     }
     if !status.is_success() {
-        anyhow::bail!("pairing {}: {}", status.as_u16(), String::from_utf8_lossy(&bytes));
+        anyhow::bail!(
+            "pairing {}: {}",
+            status.as_u16(),
+            String::from_utf8_lossy(&bytes)
+        );
     }
     Ok(serde_json::from_slice(&bytes)?)
 }
