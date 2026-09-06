@@ -9,6 +9,7 @@ description = "openpair node web dashboard + control API"
 pair-proto = { path = "../pair-proto" }
 pair-trust = { path = "../pair-trust" }
 pair-proxy = { path = "../pair-proxy" }
+pair-cluster = { path = "../pair-cluster" }
 pair-nodeinfo = { path = "../pair-nodeinfo" }
 serde.workspace = true
 serde_json.workspace = true

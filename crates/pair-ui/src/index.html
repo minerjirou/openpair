@@ -31,7 +31,10 @@
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
   .bar { height:8px; background:#0b0e13; border-radius:4px; overflow:hidden; border:1px solid var(--line); }
   .bar > i { display:block; height:100%; background:var(--acc); }
-  #msg { min-height:18px; font-size:12px; }
+  #msg, #pmsg { min-height:18px; font-size:12px; }
+  h3 { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--mut); margin:16px 0 6px; }
+  .pin { font-family:ui-monospace,monospace; font-size:24px; letter-spacing:4px; font-weight:700; color:var(--acc); padding:2px 10px; border:1px solid var(--acc); border-radius:8px; background:#0b0e13; }
+  input.pinin { width:110px; letter-spacing:3px; text-align:center; font-family:ui-monospace,monospace; }
 </style>
 </head>
 <body>
@@ -56,8 +59,24 @@
     <table><thead><tr><th>peer</th><th>host</th><th>ingress</th><th>pinned</th><th>models</th></tr></thead><tbody id="peers"></tbody></table>
   </section>
   <section class="card wide">
-    <h2>Pairing</h2>
-    <p class="muted">Pair two openpair nodes by exchanging certificates (mutual TLS trust). Open each node's dashboard and pair to the other.</p>
+    <h2>Cluster pairing (EAP-NOOB)</h2>
+    <p class="muted">Join a real PAIR cluster, or grow this one. To invite a node, enter its address — the inviter shows a 6-digit PIN, which the joiner enters below. Trust (mutual TLS) is established on success.</p>
+    <div class="row">
+      <input id="joineraddr" placeholder="JOINER_HOST  (or HOST:14321)" style="flex:1; min-width:220px">
+      <button onclick="invitePeer()">Invite a node</button>
+    </div>
+    <div id="invitebox" class="row" hidden>
+      <span class="muted">Show this PIN on the joining node:</span>
+      <span id="invitepin" class="pin"></span>
+      <span id="inviteid" class="muted mono"></span>
+    </div>
+    <div class="row"><div id="pmsg"></div></div>
+    <h3>Invitations to this node</h3>
+    <table><thead><tr><th>from</th><th>cluster</th><th>enter PIN</th><th></th></tr></thead><tbody id="pending"></tbody></table>
+  </section>
+  <section class="card wide">
+    <h2>Dev trust (certificate exchange)</h2>
+    <p class="muted">Development shortcut for local multi-node testing: pair two openpair nodes by swapping certificates directly (no PIN). Not a substitute for EAP-NOOB pairing above.</p>
     <div class="row">
       <input id="peerurl" placeholder="http://PEER_HOST:7070" style="flex:1; min-width:240px">
       <button onclick="pair()">Pair with peer</button>
@@ -108,6 +127,57 @@ async function pair(){
     $('#msg').innerHTML = r.ok ? `<span class="pill ok">paired</span> with ${esc(r.node_uuid||'')}` : `<span class="pill no">failed</span> ${esc(r.error||'')}`; refresh();
   } catch(e){ $('#msg').innerHTML = `<span class="pill no">error</span> ${esc(e)}`; }
 }
+// --- EAP-NOOB cluster pairing ---
+async function invitePeer(){
+  const joiner = $('#joineraddr').value.trim(); if(!joiner) return;
+  $('#pmsg').textContent = 'Inviting… (driving the Initial Exchange)';
+  $('#invitebox').hidden = true;
+  try {
+    const r = await (await fetch('/api/pairing/invite',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({joiner})})).json();
+    if (r.ok) {
+      $('#invitepin').textContent = r.pin;
+      $('#inviteid').textContent = 'invite ' + (r.invite_id||'').slice(0,8);
+      $('#invitebox').hidden = false;
+      $('#pmsg').innerHTML = `<span class="pill ok">invited</span> ${esc(r.joiner||'')} — waiting for the PIN to be entered there`;
+    } else {
+      $('#pmsg').innerHTML = `<span class="pill no">failed</span> ${esc(r.error||'')}`;
+    }
+  } catch(e){ $('#pmsg').innerHTML = `<span class="pill no">error</span> ${esc(e)}`; }
+}
+let pendingIds = '';
+async function refreshPending(){
+  try {
+    const r = await (await fetch('/api/pairing/pending')).json();
+    const invs = r.invites||[];
+    const ids = invs.map(i=>i.invite_id).join(',');
+    // Only rebuild when the set changes, so a half-typed PIN isn't wiped.
+    if (ids === pendingIds) return;
+    pendingIds = ids;
+    $('#pending').innerHTML = invs.map(i=>{
+      const cl = i.cluster_friendly_name || i.cluster_id || '(unnamed)';
+      return `<tr><td>${esc(i.from_name||'')}<div class="muted mono">${esc((i.from_node_uuid||'').slice(0,13))}…</div></td>`
+        + `<td>${esc(cl)}</td>`
+        + `<td><input class="pinin" id="pin_${esc(i.invite_id)}" placeholder="------" maxlength="6" inputmode="numeric"></td>`
+        + `<td><button onclick="joinInvite('${esc(i.invite_id)}')">Join</button></td></tr>`;
+    }).join('') || '<tr><td colspan=4 class="muted">no invitations</td></tr>';
+  } catch(e){ /* node may be starting */ }
+}
+async function joinInvite(id){
+  const el = document.getElementById('pin_'+id); const pin = el ? el.value.trim() : '';
+  if(!/^[0-9]{6}$/.test(pin)){ $('#pmsg').innerHTML = `<span class="pill no">invalid</span> PIN must be 6 digits`; return; }
+  $('#pmsg').textContent = 'Joining… (driving the Completion Exchange)';
+  try {
+    const r = await (await fetch('/api/pairing/respond',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({invite_id:id, pin})})).json();
+    if (r.ok) {
+      const cl = r.cluster_friendly_name || r.cluster_id || '';
+      $('#pmsg').innerHTML = `<span class="pill ok">joined</span> cluster ${esc(cl)} via ${esc(r.name||'')} — certificate pinned`;
+      pendingIds = ' '; // force a rebuild on next tick
+    } else {
+      $('#pmsg').innerHTML = `<span class="pill no">failed</span> ${esc(r.error||'')}`;
+    }
+    refresh();
+  } catch(e){ $('#pmsg').innerHTML = `<span class="pill no">error</span> ${esc(e)}`; }
+}
 async function showCert(){ $('#mycert').value = await (await fetch('/api/identity/cert')).text(); }
 async function addCert(){
   const pem = $('#addcert').value.trim(); if(!pem) return;
@@ -115,6 +185,7 @@ async function addCert(){
   $('#msg').innerHTML = r.ok ? `<span class="pill ok">added</span> ${esc(r.node_uuid||'')}` : `<span class="pill no">failed</span> ${esc(r.error||'')}`; refresh();
 }
 refresh(); setInterval(refresh, 2000);
+refreshPending(); setInterval(refreshPending, 2000);
 </script>
 </body>
 </html>

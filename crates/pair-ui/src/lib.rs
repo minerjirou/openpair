@@ -30,6 +30,8 @@ pub struct UiContext {
     pub routing: Arc<RwLock<RoutingTable>>,
     /// This node's mutual-TLS `/ingress` port (advertised to peers on pairing).
     pub ingress_port: u16,
+    /// The EAP-NOOB cluster-pairing endpoint (see [`pair_cluster`]).
+    pub pairing: Arc<pair_cluster::PairingNode>,
 }
 
 /// Serve the dashboard + control API until `shutdown` resolves.
@@ -81,6 +83,22 @@ async fn route(
         ("POST", "/api/trust/pair") => {
             let body = read_body(req).await;
             match pair(&ctx, &body).await {
+                Ok(v) => json_ok(v),
+                Err(e) => json_ok(json!({"ok": false, "error": e.to_string()})),
+            }
+        }
+        // --- EAP-NOOB cluster pairing (real cluster join) ---
+        ("GET", "/api/pairing/pending") => json_ok(pending_invites(&ctx).await),
+        ("POST", "/api/pairing/invite") => {
+            let body = read_body(req).await;
+            match invite(&ctx, &body).await {
+                Ok(v) => json_ok(v),
+                Err(e) => json_ok(json!({"ok": false, "error": e.to_string()})),
+            }
+        }
+        ("POST", "/api/pairing/respond") => {
+            let body = read_body(req).await;
+            match respond(&ctx, &body).await {
                 Ok(v) => json_ok(v),
                 Err(e) => json_ok(json!({"ok": false, "error": e.to_string()})),
             }
@@ -170,6 +188,76 @@ async fn pair(ctx: &UiContext, body: &[u8]) -> anyhow::Result<serde_json::Value>
             .upsert_peer_meta(&peer_uuid, host.clone(), peer_ingress, true);
     }
     Ok(json!({"ok": true, "node_uuid": peer_uuid, "ingress_port": peer_ingress}))
+}
+
+// --- EAP-NOOB cluster pairing ---------------------------------------------
+
+/// Invites awaiting a local PIN response (this node as joiner).
+async fn pending_invites(ctx: &UiContext) -> serde_json::Value {
+    let invites: Vec<_> = ctx
+        .pairing
+        .pending_invites()
+        .await
+        .into_iter()
+        .map(|p| {
+            json!({
+                "invite_id": p.invite_id,
+                "from_node_uuid": p.from_node_uuid,
+                "from_name": p.from_name,
+                "cluster_id": p.cluster_id,
+                "cluster_friendly_name": p.cluster_friendly_name,
+                "inviter_addr": p.inviter_addr,
+            })
+        })
+        .collect();
+    json!({ "invites": invites })
+}
+
+/// Inviter: drive an Initial Exchange to a joiner and return the PIN to display.
+/// `body` = `{"joiner":"host[:port]"}`.
+async fn invite(ctx: &UiContext, body: &[u8]) -> anyhow::Result<serde_json::Value> {
+    let v: serde_json::Value = serde_json::from_slice(body)?;
+    let joiner = v
+        .get("joiner")
+        .and_then(|p| p.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("joiner address required"))?;
+    let addr = normalize_pairing_addr(joiner);
+    let (invite_id, pin) = ctx.pairing.create_invite(&addr).await?;
+    Ok(json!({ "ok": true, "invite_id": invite_id, "pin": pin, "joiner": addr }))
+}
+
+/// Joiner: submit the PIN for a pending invite, driving the Completion Exchange.
+/// `body` = `{"invite_id":"…","pin":"123456"}`.
+async fn respond(ctx: &UiContext, body: &[u8]) -> anyhow::Result<serde_json::Value> {
+    let v: serde_json::Value = serde_json::from_slice(body)?;
+    let invite_id = v
+        .get("invite_id")
+        .and_then(|x| x.as_str())
+        .ok_or_else(|| anyhow::anyhow!("invite_id required"))?;
+    let pin = v
+        .get("pin")
+        .and_then(|x| x.as_str())
+        .map(str::trim)
+        .ok_or_else(|| anyhow::anyhow!("pin required"))?;
+    let paired = ctx.pairing.submit_pin(invite_id, pin).await?;
+    Ok(json!({
+        "ok": true,
+        "node_uuid": paired.peer.node_uuid,
+        "name": paired.peer.name,
+        "cluster_id": paired.peer.cluster_id,
+        "cluster_friendly_name": paired.peer.cluster_friendly_name,
+    }))
+}
+
+/// Normalize a bare `host` to `host:14321`, leaving an explicit port intact.
+fn normalize_pairing_addr(input: &str) -> String {
+    if input.rsplit_once(':').map(|(_, p)| p.parse::<u16>().is_ok()) == Some(true) {
+        input.to_string()
+    } else {
+        format!("{input}:{}", pair_cluster::DEFAULT_PAIRING_PORT)
+    }
 }
 
 // --- tiny plain-HTTP client + helpers -------------------------------------

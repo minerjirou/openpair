@@ -921,6 +921,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "pair-cluster",
  "pair-nodeinfo",
  "pair-proto",
  "pair-proxy",

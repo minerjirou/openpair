@@ -160,9 +160,10 @@ async fn main() -> anyhow::Result<()> {
 
     // 4b. Cluster pairing channel (plain-HTTP /v1/cluster/pairing, §7.2).
     //     Serving it lets a cluster inviter reach this node; the operator drives
-    //     the PIN step via `openpair-node join`. Pairing establishes mutual-TLS
-    //     trust by pinning the peer's authenticated certificate.
-    {
+    //     the PIN step from the dashboard (or `openpair-node join`). Pairing
+    //     establishes mutual-TLS trust by pinning the peer's authenticated cert.
+    //     The same PairingNode backs both the channel and the UI's controls.
+    let pairing_node = {
         let pairing_bind: std::net::SocketAddr =
             env_or("OPENPAIR_PAIRING_BIND", DEFAULT_PAIRING_BIND).parse()?;
         let cluster_dir = std::env::var("OPENPAIR_CLUSTER_DIR").ok().map(PathBuf::from);
@@ -184,15 +185,17 @@ async fn main() -> anyhow::Result<()> {
             String::new(),
         );
         let node = pairing::build_node(profile, sink);
+        let srv = node.clone();
         tokio::spawn(async move {
             if let Err(e) =
-                pair_cluster::serve_pairing(pairing_bind, node, std::future::pending()).await
+                pair_cluster::serve_pairing(pairing_bind, srv, std::future::pending()).await
             {
                 warn!(error = %e, "pairing channel exited");
             }
         });
         info!(%pairing_bind, advertised = %advertised, "serving /v1/cluster/pairing (EAP-NOOB)");
-    }
+        node
+    };
 
     // 5. Routing table + model pollers + cluster-aware loopback proxy.
     let routing = Arc::new(RwLock::new(pair_proxy::RoutingTable::new(node_id.clone())));
@@ -207,6 +210,7 @@ async fn main() -> anyhow::Result<()> {
             pins: pins.clone(),
             routing: routing.clone(),
             ingress_port: ingress_bind.port(),
+            pairing: pairing_node.clone(),
         });
         tokio::spawn(async move {
             if let Err(e) = pair_ui::serve(ui_bind, ui_ctx, std::future::pending()).await {
